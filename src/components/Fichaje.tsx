@@ -1,26 +1,31 @@
 import React, { useEffect, useState } from 'react';
-import { Camera, Wifi, Clock, CheckCircle, Square, Coffee, TrendingUp, Briefcase, Save, RotateCcw } from 'lucide-react';
+import { Camera, Wifi, Clock, CheckCircle, Square, Coffee, TrendingUp, Briefcase, Save, RotateCcw, Edit3 } from 'lucide-react';
 import type { Cliente, Actividad, RegistroJornada } from '../types';
 
 interface FichajeProps {
   clientes: Cliente[];
   registros: RegistroJornada[];
   onGuardarRegistro: (registro: RegistroJornada) => void;
+  onActualizarRegistro: (registro: RegistroJornada) => void;
 }
 
 interface DraftState {
   clienteId: string;
   etapa: 'inicio' | 'entrada' | 'trabajando' | 'break' | 'finalizado';
+  fechaSeleccionada: string;
   horaEntrada: string;
   wifiVerificado: boolean;
   listaActividades: Actividad[];
   duracionHoras: number;
 }
 
-export const Fichaje: React.FC<FichajeProps> = ({ clientes, registros, onGuardarRegistro }) => {
+export const Fichaje: React.FC<FichajeProps> = ({ clientes, registros, onGuardarRegistro, onActualizarRegistro }) => {
+  const hoy = new Date().toISOString().split('T')[0];
+
   const [clienteSeleccionado, setClienteSeleccionado] = useState<string>('');
   const [etapa, setEtapa] = useState<'inicio' | 'entrada' | 'trabajando' | 'break' | 'finalizado'>('inicio');
   const [duracionHoras, setDuracionHoras] = useState<number>(8);
+  const [fechaSeleccionada, setFechaSeleccionada] = useState<string>(hoy);
 
   const [horaEntrada, setHoraEntrada] = useState<string>('');
   const [wifiVerificado, setWifiVerificado] = useState<boolean>(false);
@@ -30,6 +35,9 @@ export const Fichaje: React.FC<FichajeProps> = ({ clientes, registros, onGuardar
   const [listaActividades, setListaActividades] = useState<Actividad[]>([]);
   const [mensajeBorrador, setMensajeBorrador] = useState<string>('');
   const [borradorCargado, setBorradorCargado] = useState<DraftState | null>(null);
+  const [registroEditandoId, setRegistroEditandoId] = useState<string | null>(null);
+  const [registroEditando, setRegistroEditando] = useState<RegistroJornada | null>(null);
+  const [descripcionEdicion, setDescripcionEdicion] = useState<string>('');
 
   const totalHorasSemana = registros.reduce((acc, curr) => acc + (curr.totalHoras || 0), 0);
 
@@ -45,6 +53,7 @@ export const Fichaje: React.FC<FichajeProps> = ({ clientes, registros, onGuardar
       setWifiVerificado(parsed.wifiVerificado || false);
       setListaActividades(parsed.listaActividades || []);
       setDuracionHoras(parsed.duracionHoras || 8);
+      setFechaSeleccionada(parsed.fechaSeleccionada || hoy);
       setEtapa(parsed.etapa || 'entrada');
       setMensajeBorrador('Tienes un registro guardado. Puedes retomarlo cuando quieras.');
     } catch {
@@ -56,6 +65,7 @@ export const Fichaje: React.FC<FichajeProps> = ({ clientes, registros, onGuardar
     const draft: DraftState = {
       clienteId: clienteSeleccionado,
       etapa: siguienteEtapa,
+      fechaSeleccionada,
       horaEntrada,
       wifiVerificado,
       listaActividades,
@@ -74,6 +84,7 @@ export const Fichaje: React.FC<FichajeProps> = ({ clientes, registros, onGuardar
     setWifiVerificado(borradorCargado.wifiVerificado);
     setListaActividades(borradorCargado.listaActividades);
     setDuracionHoras(borradorCargado.duracionHoras || 8);
+    setFechaSeleccionada(borradorCargado.fechaSeleccionada || hoy);
     setEtapa(borradorCargado.etapa || 'entrada');
     setMensajeBorrador('Continuando tu registro guardado.');
   };
@@ -111,7 +122,7 @@ export const Fichaje: React.FC<FichajeProps> = ({ clientes, registros, onGuardar
     const nuevoRegistro: RegistroJornada = {
       id: Date.now().toString(),
       clienteId: clienteSeleccionado,
-      fecha: new Date().toISOString().split('T')[0],
+      fecha: fechaSeleccionada,
       horaEntrada,
       horaSalida: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       wifiEntradaValido: wifiVerificado,
@@ -123,6 +134,40 @@ export const Fichaje: React.FC<FichajeProps> = ({ clientes, registros, onGuardar
     onGuardarRegistro(nuevoRegistro);
     limpiarBorrador();
     setEtapa('finalizado');
+  };
+
+  const abrirEdicionRegistro = (registro: RegistroJornada) => {
+    setRegistroEditandoId(registro.id);
+    setRegistroEditando({ ...registro, actividades: [...registro.actividades] });
+    setDescripcionEdicion('');
+  };
+
+  const guardarEdicionRegistro = () => {
+    if (!registroEditando) return;
+
+    onActualizarRegistro(registroEditando);
+    setRegistroEditandoId(null);
+    setRegistroEditando(null);
+  };
+
+  const agregarActividadEdicion = () => {
+    if (!registroEditando || !descripcionEdicion.trim()) return;
+
+    setRegistroEditando({
+      ...registroEditando,
+      actividades: [
+        ...registroEditando.actividades,
+        { id: Date.now().toString(), tipo: 'otro', descripcion: descripcionEdicion.trim() }
+      ]
+    });
+    setDescripcionEdicion('');
+  };
+
+  const eliminarActividadEdicion = (index: number) => {
+    if (!registroEditando) return;
+
+    const nuevasActividades = registroEditando.actividades.filter((_, i) => i !== index);
+    setRegistroEditando({ ...registroEditando, actividades: nuevasActividades });
   };
 
   return (
@@ -229,6 +274,132 @@ export const Fichaje: React.FC<FichajeProps> = ({ clientes, registros, onGuardar
               })}
             </div>
           </div>
+
+          <div className="bg-white p-5 rounded-3xl border border-neutral-200 shadow-sm space-y-3">
+            <div className="flex justify-between items-center">
+              <h3 className="text-sm font-semibold text-neutral-900 flex items-center gap-2">
+                <Clock size={16} className="text-neutral-700" /> Registros Recientes
+              </h3>
+              <span className="text-xs text-neutral-500">{registros.filter((r) => r.completado).length} en total</span>
+            </div>
+
+            <div className="space-y-2">
+              {registros.filter((r) => r.completado).slice().reverse().map((registro) => {
+                const cliente = clientes.find((c) => c.id === registro.clienteId);
+                const esEditando = registroEditandoId === registro.id;
+
+                return (
+                  <div key={registro.id} className="rounded-2xl border border-neutral-200 bg-neutral-50 p-3 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold text-neutral-900">{cliente?.nombre || 'Cliente'}</p>
+                        <p className="text-[11px] text-neutral-500">{registro.fecha} • {registro.totalHoras}h</p>
+                      </div>
+                      <button
+                        onClick={() => abrirEdicionRegistro(registro)}
+                        className="flex items-center gap-1 rounded-xl border border-neutral-200 bg-white px-2.5 py-1.5 text-[10px] font-medium text-neutral-700"
+                      >
+                        <Edit3 size={12} /> Editar
+                      </button>
+                    </div>
+
+                    {esEditando && registroEditando && (
+                      <div className="space-y-2 rounded-2xl border border-neutral-200 bg-white p-3">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-semibold uppercase tracking-wide text-neutral-600">Fecha</label>
+                          <input
+                            type="date"
+                            min={hoy}
+                            value={registroEditando.fecha}
+                            onChange={(e) => setRegistroEditando({ ...registroEditando, fecha: e.target.value })}
+                            className="w-full rounded-xl border border-neutral-200 p-2 text-xs"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-semibold uppercase tracking-wide text-neutral-600">Hora entrada</label>
+                            <input
+                              type="time"
+                              value={registroEditando.horaEntrada}
+                              onChange={(e) => setRegistroEditando({ ...registroEditando, horaEntrada: e.target.value })}
+                              className="w-full rounded-xl border border-neutral-200 p-2 text-xs"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-semibold uppercase tracking-wide text-neutral-600">Horas</label>
+                            <select
+                              value={registroEditando.totalHoras}
+                              onChange={(e) => setRegistroEditando({ ...registroEditando, totalHoras: Number(e.target.value) })}
+                              className="w-full rounded-xl border border-neutral-200 p-2 text-xs"
+                            >
+                              <option value={1}>1 hora</option>
+                              <option value={8}>8 horas</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-semibold uppercase tracking-wide text-neutral-600">Actividades</label>
+                          {registroEditando.actividades.map((actividad, index) => (
+                            <div key={actividad.id} className="flex items-center gap-2">
+                              <input
+                                value={actividad.descripcion}
+                                onChange={(e) => {
+                                  const nuevas = [...registroEditando.actividades];
+                                  nuevas[index] = { ...nuevas[index], descripcion: e.target.value };
+                                  setRegistroEditando({ ...registroEditando, actividades: nuevas });
+                                }}
+                                className="flex-1 rounded-xl border border-neutral-200 p-2 text-xs"
+                              />
+                              <button
+                                onClick={() => eliminarActividadEdicion(index)}
+                                className="rounded-xl border border-neutral-200 px-2 py-2 text-[10px] text-neutral-600"
+                              >
+                                X
+                              </button>
+                            </div>
+                          ))}
+                          <div className="flex gap-2">
+                            <input
+                              value={descripcionEdicion}
+                              onChange={(e) => setDescripcionEdicion(e.target.value)}
+                              placeholder="Nueva actividad"
+                              className="flex-1 rounded-xl border border-neutral-200 p-2 text-xs"
+                            />
+                            <button
+                              onClick={agregarActividadEdicion}
+                              className="rounded-xl bg-black px-3 py-2 text-[10px] font-medium text-white"
+                            >
+                              Añadir
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              setRegistroEditandoId(null);
+                              setRegistroEditando(null);
+                            }}
+                            className="flex-1 rounded-xl border border-neutral-200 px-3 py-2 text-[10px] font-medium text-neutral-700"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            onClick={guardarEdicionRegistro}
+                            className="flex-1 rounded-xl bg-emerald-600 px-3 py-2 text-[10px] font-medium text-white"
+                          >
+                            Guardar cambios
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       )}
 
@@ -241,6 +412,18 @@ export const Fichaje: React.FC<FichajeProps> = ({ clientes, registros, onGuardar
             <button onClick={() => setEtapa('inicio')} className="text-xs text-neutral-500 hover:text-black underline">
               ← Volver
             </button>
+          </div>
+
+          <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-3 space-y-2">
+            <label className="block text-[11px] font-semibold text-neutral-700">Fecha del registro</label>
+            <input
+              type="date"
+              min={hoy}
+              value={fechaSeleccionada}
+              onChange={(e) => setFechaSeleccionada(e.target.value)}
+              className="w-full p-2.5 border border-neutral-200 rounded-xl text-xs bg-white text-neutral-800"
+            />
+            <p className="text-[10px] text-neutral-500">Puedes elegir hoy o una fecha futura para este registro.</p>
           </div>
 
           <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-3 space-y-2">

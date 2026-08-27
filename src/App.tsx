@@ -89,6 +89,12 @@ export function App() {
     setNuevoClienteNombre('');
   };
 
+  const handleActualizarRegistro = (registroActualizado: RegistroJornada) => {
+    setRegistros((prev) =>
+      prev.map((registro) => (registro.id === registroActualizado.id ? registroActualizado : registro))
+    );
+  };
+
   const limpiarDatos = () => {
     if (window.confirm('¿Deseas limpiar solo los registros y facturas, manteniendo los clientes?')) {
       setRegistros([]);
@@ -186,6 +192,7 @@ export function App() {
             onGuardarRegistro={(nuevoReg: RegistroJornada) => {
               setRegistros([...registros, nuevoReg]);
             }}
+            onActualizarRegistro={handleActualizarRegistro}
           />
         )}
 
