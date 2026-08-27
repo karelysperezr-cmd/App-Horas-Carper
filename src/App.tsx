@@ -2,9 +2,25 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Fichaje } from './components/Fichaje';
 import { GeneradorFactura } from './components/GeneradorFactura';
 import type { Cliente, RegistroJornada, Factura } from './types';
-import { Clock, FileText, Users, LogOut, Plus, Briefcase } from 'lucide-react';
+import { Clock, FileText, Users, LogOut, Plus, Briefcase, Download, Upload } from 'lucide-react';
 
 const CLIENTES_DE_EJEMPLO = ['Intercenter Colombia', 'DICA CASTELL'];
+const STORAGE_KEY = 'carper-app-data';
+const DB_NAME = 'carper-db';
+const STORE_NAME = 'app-state';
+const DB_VERSION = 1;
+
+type DatosPersistidos = {
+  clientes: Cliente[];
+  registros: RegistroJornada[];
+  facturas: Factura[];
+  updatedAt: string;
+};
+
+const crearDatosPersistidos = (datos: Omit<DatosPersistidos, 'updatedAt'>): DatosPersistidos => ({
+  ...datos,
+  updatedAt: new Date().toISOString()
+});
 
 const leerDesdeStorage = <T,>(key: string, fallback: T[]): T[] => {
   if (typeof window === 'undefined') return fallback;
@@ -20,6 +36,104 @@ const leerDesdeStorage = <T,>(key: string, fallback: T[]): T[] => {
   }
 };
 
+const leerDatosPersistidos = (): DatosPersistidos => {
+  if (typeof window === 'undefined') {
+    return crearDatosPersistidos({ clientes: [], registros: [], facturas: [] });
+  }
+
+  const fuentes = [
+    window.localStorage.getItem(STORAGE_KEY),
+    window.sessionStorage.getItem(STORAGE_KEY),
+    window.localStorage.getItem('carper-clientes') ? JSON.stringify({ clientes: leerDesdeStorage<Cliente>('carper-clientes', []), registros: leerDesdeStorage<RegistroJornada>('carper-registros', []), facturas: leerDesdeStorage<Factura>('carper-facturas', []) }) : null
+  ].filter(Boolean) as string[];
+
+  for (const fuente of fuentes) {
+    try {
+      const parsed = JSON.parse(fuente) as Partial<DatosPersistidos>;
+      if (parsed && Array.isArray(parsed.clientes) && Array.isArray(parsed.registros) && Array.isArray(parsed.facturas)) {
+        return crearDatosPersistidos({
+          clientes: parsed.clientes as Cliente[],
+          registros: parsed.registros as RegistroJornada[],
+          facturas: parsed.facturas as Factura[]
+        });
+      }
+    } catch {
+      // Se intenta migrar desde claves antiguas.
+    }
+  }
+
+  return crearDatosPersistidos({
+    clientes: leerDesdeStorage<Cliente>('carper-clientes', []),
+    registros: leerDesdeStorage<RegistroJornada>('carper-registros', []),
+    facturas: leerDesdeStorage<Factura>('carper-facturas', [])
+  });
+};
+
+const guardarDatosPersistidos = (datos: Omit<DatosPersistidos, 'updatedAt'>) => {
+  if (typeof window === 'undefined') return;
+
+  const payload = crearDatosPersistidos(datos);
+  const texto = JSON.stringify(payload);
+
+  window.localStorage.setItem(STORAGE_KEY, texto);
+  window.localStorage.setItem('carper-clientes', JSON.stringify(payload.clientes));
+  window.localStorage.setItem('carper-registros', JSON.stringify(payload.registros));
+  window.localStorage.setItem('carper-facturas', JSON.stringify(payload.facturas));
+
+  try {
+    window.sessionStorage.setItem(STORAGE_KEY, texto);
+  } catch {
+    // Ignoramos fallas en sessionStorage.
+  }
+
+  if ('indexedDB' in window) {
+    const request = window.indexedDB.open(DB_NAME, DB_VERSION);
+    request.onerror = () => {
+      // Si IndexedDB falla, se queda con el guardado local.
+    };
+    request.onsuccess = () => {
+      const db = request.result;
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      store.put(payload, 'state');
+    };
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME);
+      }
+    };
+  }
+};
+
+const leerDesdeIndexedDB = async (): Promise<DatosPersistidos | null> => {
+  if (typeof window === 'undefined' || !('indexedDB' in window)) {
+    return null;
+  }
+
+  return new Promise((resolve) => {
+    const request = window.indexedDB.open(DB_NAME, DB_VERSION);
+    request.onerror = () => resolve(null);
+    request.onsuccess = () => {
+      const db = request.result;
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      const getReq = store.get('state');
+      getReq.onsuccess = () => {
+        const value = getReq.result as DatosPersistidos | undefined;
+        resolve(value ?? null);
+      };
+      getReq.onerror = () => resolve(null);
+    };
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME);
+      }
+    };
+  });
+};
+
 export function App() {
   const [autenticado, setAutenticado] = useState<boolean>(false);
   const [usuario, setUsuario] = useState<string>('');
@@ -29,16 +143,16 @@ export function App() {
   const [pestanaActiva, setPestanaActiva] = useState<'fichaje' | 'facturas' | 'clientes'>('fichaje');
 
   const [clientes, setClientes] = useState<Cliente[]>(() => {
-    const guardados = leerDesdeStorage<Cliente>('carper-clientes', []);
-    return guardados.filter((cliente) => !CLIENTES_DE_EJEMPLO.includes(cliente.nombre));
+    const guardados = leerDatosPersistidos();
+    return guardados.clientes.filter((cliente) => !CLIENTES_DE_EJEMPLO.includes(cliente.nombre));
   });
 
   const [registros, setRegistros] = useState<RegistroJornada[]>(() => {
-    return leerDesdeStorage<RegistroJornada>('carper-registros', []);
+    return leerDatosPersistidos().registros;
   });
 
   const [facturas, setFacturas] = useState<Factura[]>(() => {
-    return leerDesdeStorage<Factura>('carper-facturas', []);
+    return leerDatosPersistidos().facturas;
   });
 
   const [nuevoClienteNombre, setNuevoClienteNombre] = useState<string>('');
@@ -49,20 +163,49 @@ export function App() {
 
     if (sanitizados.length !== clientes.length) {
       setClientes(sanitizados);
-      window.localStorage.setItem('carper-clientes', JSON.stringify(sanitizados));
+      guardarDatosPersistidos({ clientes: sanitizados, registros, facturas });
       return;
     }
 
-    window.localStorage.setItem('carper-clientes', JSON.stringify(clientes));
-  }, [clientes]);
+    guardarDatosPersistidos({ clientes, registros, facturas });
+  }, [clientes, registros, facturas]);
 
   useEffect(() => {
-    window.localStorage.setItem('carper-registros', JSON.stringify(registros));
-  }, [registros]);
+    let activo = true;
 
-  useEffect(() => {
-    window.localStorage.setItem('carper-facturas', JSON.stringify(facturas));
-  }, [facturas]);
+    const cargarDatos = async () => {
+      const datosDesdeDb = await leerDesdeIndexedDB();
+      if (!activo) return;
+
+      const datos = datosDesdeDb ?? leerDatosPersistidos();
+      const clientesLimpios = datos.clientes.filter((cliente) => !CLIENTES_DE_EJEMPLO.includes(cliente.nombre));
+      setClientes(clientesLimpios);
+      setRegistros(datos.registros);
+      setFacturas(datos.facturas);
+    };
+
+    void cargarDatos();
+
+    if (typeof window === 'undefined') return;
+
+    const onStorage = (event: StorageEvent) => {
+      if (event.key && event.key !== STORAGE_KEY && event.key !== 'carper-clientes' && event.key !== 'carper-registros' && event.key !== 'carper-facturas') {
+        return;
+      }
+
+      const datos = leerDatosPersistidos();
+      const clientesLimpios = datos.clientes.filter((cliente) => !CLIENTES_DE_EJEMPLO.includes(cliente.nombre));
+      setClientes(clientesLimpios);
+      setRegistros(datos.registros);
+      setFacturas(datos.facturas);
+    };
+
+    window.addEventListener('storage', onStorage);
+    return () => {
+      activo = false;
+      window.removeEventListener('storage', onStorage);
+    };
+  }, []);
 
   const handleLogin = (e: FormEvent) => {
     e.preventDefault();
@@ -80,12 +223,12 @@ export function App() {
 
     const nuevo: Cliente = {
       id: Date.now().toString(),
-      nombre: nuevoClienteNombre,
+      nombre: nuevoClienteNombre.trim(),
       tarifaHora: nuevaTarifa,
       tipoCobro: 'hora'
     };
 
-    setClientes([...clientes, nuevo]);
+    setClientes((prev) => [...prev, nuevo]);
     setNuevoClienteNombre('');
   };
 
@@ -95,12 +238,78 @@ export function App() {
     );
   };
 
+  const handleEliminarCliente = (clienteId: string) => {
+    const nombreCliente = clientes.find((cliente) => cliente.id === clienteId)?.nombre || 'este cliente';
+    const confirmar = window.confirm(`¿Seguro que deseas eliminar a ${nombreCliente} y todos sus registros asociados?`);
+
+    if (!confirmar) return;
+
+    const registrosRestantes = registros.filter((registro) => registro.clienteId !== clienteId);
+    const facturasRestantes = facturas.filter((factura) => factura.clienteId !== clienteId);
+
+    setClientes((prev) => prev.filter((cliente) => cliente.id !== clienteId));
+    setRegistros(registrosRestantes);
+    setFacturas(facturasRestantes);
+
+    const borrador = window.localStorage.getItem('carper-draft-registro');
+    if (borrador) {
+      try {
+        const draft = JSON.parse(borrador);
+        if (draft.clienteId === clienteId) {
+          window.localStorage.removeItem('carper-draft-registro');
+        }
+      } catch {
+        // Ignoramos errores al limpiar el borrador.
+      }
+    }
+  };
+
   const limpiarDatos = () => {
     if (window.confirm('¿Deseas limpiar solo los registros y facturas, manteniendo los clientes?')) {
       setRegistros([]);
       setFacturas([]);
-      window.localStorage.setItem('carper-registros', JSON.stringify([]));
-      window.localStorage.setItem('carper-facturas', JSON.stringify([]));
+      guardarDatosPersistidos({ clientes, registros: [], facturas: [] });
+    }
+  };
+
+  const exportarDatos = () => {
+    const payload = JSON.stringify(crearDatosPersistidos({ clientes, registros, facturas }), null, 2);
+    const blob = new Blob([payload], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `carper-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const importarDatos = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const archivo = event.target.files?.[0];
+    if (!archivo) return;
+
+    try {
+      const texto = await archivo.text();
+      const parsed = JSON.parse(texto) as Partial<DatosPersistidos>;
+      if (!parsed || !Array.isArray(parsed.clientes) || !Array.isArray(parsed.registros) || !Array.isArray(parsed.facturas)) {
+        window.alert('El archivo no tiene el formato correcto.');
+        return;
+      }
+
+      const datos = crearDatosPersistidos({
+        clientes: parsed.clientes as Cliente[],
+        registros: parsed.registros as RegistroJornada[],
+        facturas: parsed.facturas as Factura[]
+      });
+
+      setClientes(datos.clientes);
+      setRegistros(datos.registros);
+      setFacturas(datos.facturas);
+      guardarDatosPersistidos({ clientes: datos.clientes, registros: datos.registros, facturas: datos.facturas });
+      window.alert('Datos importados correctamente.');
+    } catch {
+      window.alert('No se pudo leer el archivo.');
+    } finally {
+      event.target.value = '';
     }
   };
 
@@ -190,7 +399,7 @@ export function App() {
             clientes={clientes}
             registros={registros}
             onGuardarRegistro={(nuevoReg: RegistroJornada) => {
-              setRegistros([...registros, nuevoReg]);
+              setRegistros((prev) => [...prev, nuevoReg]);
             }}
             onActualizarRegistro={handleActualizarRegistro}
           />
@@ -201,7 +410,7 @@ export function App() {
             clientes={clientes}
             registros={registros}
             onGuardarFactura={(nuevaFac: Factura) => {
-              setFacturas([...facturas, nuevaFac]);
+              setFacturas((prev) => [...prev, nuevaFac]);
             }}
           />
         )}
@@ -243,22 +452,44 @@ export function App() {
             </div>
 
             <div className="bg-white p-5 rounded-3xl border border-neutral-200 shadow-sm space-y-3">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <h4 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">Clientes Guardados</h4>
                 <button
                   onClick={limpiarDatos}
-                  className="text-[10px] text-rose-600 font-medium underline decoration-rose-300"
+                  className="text-[10px] text-rose-600 font-medium underline decoration-rose-300 leading-snug text-left"
                 >
                   Vaciar registros y facturas (mantener clientes)
                 </button>
               </div>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={exportarDatos}
+                  className="flex items-center gap-2 rounded-2xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-[11px] font-medium text-neutral-700"
+                >
+                  <Download size={14} /> Exportar datos
+                </button>
+                <label className="flex cursor-pointer items-center gap-2 rounded-2xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-[11px] font-medium text-neutral-700">
+                  <Upload size={14} /> Importar datos
+                  <input type="file" accept="application/json" className="hidden" onChange={importarDatos} />
+                </label>
+              </div>
+
               <div className="space-y-2">
                 {clientes.map((c) => (
-                  <div key={c.id} className="p-3 bg-neutral-50 rounded-2xl border border-neutral-100 flex justify-between items-center text-xs">
+                  <div key={c.id} className="p-3 bg-neutral-50 rounded-2xl border border-neutral-100 flex flex-wrap justify-between items-center gap-2 text-xs">
                     <span className="font-semibold text-neutral-900">{c.nombre}</span>
-                    <span className="px-2.5 py-1 bg-white border border-neutral-200 rounded-xl text-neutral-700 font-medium">
-                      ${c.tarifaHora}/h
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-1 bg-white border border-neutral-200 rounded-xl text-neutral-700 font-medium">
+                        ${c.tarifaHora}/h
+                      </span>
+                      <button
+                        onClick={() => handleEliminarCliente(c.id)}
+                        className="rounded-xl border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[10px] font-medium text-rose-600 hover:bg-rose-100"
+                      >
+                        Eliminar
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -271,7 +502,7 @@ export function App() {
         <div className="mx-auto flex max-w-md items-center justify-around px-3 py-2">
           <button
             onClick={() => setPestanaActiva('fichaje')}
-            className={`flex min-w-[70px] flex-col items-center gap-1 rounded-2xl px-2 py-2 text-[10px] transition ${pestanaActiva === 'fichaje' ? 'bg-black text-white shadow-sm' : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800'}`}
+            className={`flex flex-1 min-w-0 flex-col items-center justify-center gap-1 rounded-2xl px-1 py-2 text-[10px] leading-tight transition ${pestanaActiva === 'fichaje' ? 'bg-black text-white shadow-sm' : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800'}`}
           >
             <Clock size={18} />
             <span>Fichaje</span>
@@ -279,7 +510,7 @@ export function App() {
 
           <button
             onClick={() => setPestanaActiva('facturas')}
-            className={`flex min-w-[70px] flex-col items-center gap-1 rounded-2xl px-2 py-2 text-[10px] transition ${pestanaActiva === 'facturas' ? 'bg-black text-white shadow-sm' : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800'}`}
+            className={`flex flex-1 min-w-0 flex-col items-center justify-center gap-1 rounded-2xl px-1 py-2 text-[10px] leading-tight transition ${pestanaActiva === 'facturas' ? 'bg-black text-white shadow-sm' : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800'}`}
           >
             <FileText size={18} />
             <span>Facturas</span>
@@ -287,7 +518,7 @@ export function App() {
 
           <button
             onClick={() => setPestanaActiva('clientes')}
-            className={`flex min-w-[70px] flex-col items-center gap-1 rounded-2xl px-2 py-2 text-[10px] transition ${pestanaActiva === 'clientes' ? 'bg-black text-white shadow-sm' : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800'}`}
+            className={`flex flex-1 min-w-0 flex-col items-center justify-center gap-1 rounded-2xl px-1 py-2 text-[10px] leading-tight transition ${pestanaActiva === 'clientes' ? 'bg-black text-white shadow-sm' : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800'}`}
           >
             <Users size={18} />
             <span>Clientes</span>

@@ -46,73 +46,100 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
     const fechaActual = new Date().toLocaleDateString();
     let currentY = 20;
 
+    doc.setFillColor(245, 245, 245);
+    doc.roundedRect(14, 12, 182, 36, 3, 3, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.setTextColor(15, 23, 42);
+    doc.text('FACTURA DE SERVICIOS', 20, 24);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(82, 82, 91);
+    doc.text(`Cliente: ${clienteActual.nombre}`, 20, 32);
+    doc.text(`Fecha de emisión: ${fechaActual}`, 20, 39);
+
     if (logoBase64) {
       try {
-        doc.addImage(logoBase64, 'JPEG', 20, 15, 25, 25);
-        currentY = 45;
+        doc.addImage(logoBase64, 'JPEG', 160, 15, 24, 24);
       } catch (error) {
-        console.error("Error al incrustar logo", error);
+        console.error('Error al incrustar logo', error);
       }
     }
 
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(20);
-    doc.setTextColor(0, 0, 0);
-    doc.text("FACTURA DE SERVICIOS", logoBase64 ? 52 : 20, currentY);
-
+    currentY = 56;
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(14, currentY - 8, 182, 26, 3, 3, 'S');
+    doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
-    doc.setTextColor(100, 100, 100);
-    doc.text(`Fecha de emisión: ${fechaActual}`, logoBase64 ? 52 : 20, currentY + 7);
-
-    currentY += 20;
-
-    doc.setFontSize(12);
-    doc.setTextColor(40, 40, 40);
-    doc.text(`Cliente: ${clienteActual.nombre}`, 20, currentY);
+    doc.setTextColor(15, 23, 42);
+    doc.text('Datos del cliente', 20, currentY);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(82, 82, 91);
     doc.text(`Modalidad: ${tipoCobroSeleccionado === 'hora' ? 'Pago por Hora' : 'Contrato Fijo'}`, 20, currentY + 8);
+    doc.text(`Tarifa por Hora: $${clienteActual.tarifaHora}`, 20, currentY + 14);
 
-    currentY += 20;
-
-    doc.setFont("helvetica", "bold");
-    doc.text("Resumen de Actividades y Jornadas", 20, currentY);
-    currentY += 10;
-
+    currentY = 92;
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(14, currentY - 8, 182, 16, 3, 3, 'S');
+    doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
+    doc.setTextColor(15, 23, 42);
+    doc.text('Resumen de jornadas', 20, currentY);
+
+    currentY += 14;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(15, 23, 42);
+    doc.text('Fecha', 20, currentY);
+    doc.text('Horas', 78, currentY);
+    doc.text('Detalle', 112, currentY);
+    doc.line(18, currentY + 2, 192, currentY + 2);
+    currentY += 8;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(51, 65, 85);
 
     registrosCliente.forEach((reg) => {
-      if (currentY > 270) {
+      if (currentY > 255) {
         doc.addPage();
-        currentY = 20;
+        currentY = 24;
       }
-      doc.text(`• Fecha: ${reg.fecha} — Horas: ${reg.totalHoras}h`, 20, currentY);
-      currentY += 6;
 
-      reg.actividades.forEach(act => {
-        doc.text(`   - [${act.tipo.toUpperCase()}] ${act.descripcion}`, 25, currentY);
-        currentY += 6;
-      });
-      currentY += 4;
+      const detalle = reg.actividades.length > 0
+        ? reg.actividades.map((act) => `${act.tipo.toUpperCase()}: ${act.descripcion}`).join(' | ')
+        : 'Sin actividades registradas';
+      const textoDetalle = doc.splitTextToSize(detalle, 72);
+
+      doc.text(reg.fecha, 20, currentY);
+      doc.text(`${reg.totalHoras}h`, 78, currentY);
+      doc.text(textoDetalle[0] || '', 112, currentY);
+      currentY += Math.max(6, textoDetalle.length * 4.5);
     });
 
-    currentY += 10;
-    if (currentY > 250) {
+    currentY += 8;
+    if (currentY > 255) {
       doc.addPage();
-      currentY = 20;
+      currentY = 24;
     }
-    
+
+    doc.setDrawColor(15, 23, 42);
     doc.setLineWidth(0.5);
-    doc.line(20, currentY, 190, currentY);
+    doc.line(18, currentY, 192, currentY);
     currentY += 10;
 
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
+    doc.setFillColor(249, 250, 251);
+    doc.roundedRect(14, currentY - 6, 182, 28, 3, 3, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(15, 23, 42);
     if (tipoCobroSeleccionado === 'hora') {
-      doc.text(`Total Horas Trabajadas: ${totalHorasCalculadas} hrs`, 20, currentY);
-      doc.text(`Tarifa por Hora: $${clienteActual.tarifaHora}`, 20, currentY + 8);
-      doc.text(`Monto Total a Pagar: $${montoTotal.toFixed(2)}`, 20, currentY + 16);
+      doc.text(`Total Horas: ${totalHorasCalculadas} hrs`, 20, currentY);
+      doc.text(`Monto Total: $${montoTotal.toFixed(2)}`, 20, currentY + 8);
     } else {
-      doc.text(`Monto Total por Contrato: $${montoTotal.toFixed(2)}`, 20, currentY);
+      doc.text(`Monto por Contrato: $${montoTotal.toFixed(2)}`, 20, currentY + 4);
     }
 
     doc.save(`Factura_${clienteActual.nombre.replace(/\s+/g, '_')}_${Date.now()}.pdf`);
@@ -121,7 +148,7 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
       id: Date.now().toString(),
       clienteId,
       fechaEmision: fechaActual,
-      registrosIds: registrosCliente.map(r => r.id),
+      registrosIds: registrosCliente.map((r) => r.id),
       totalHoras: totalHorasCalculadas,
       montoTotal,
       tipoCobro: tipoCobroSeleccionado
@@ -144,7 +171,7 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
         </div>
       )}
 
-      <div className="p-3 bg-neutral-50 rounded-2xl border border-dashed border-neutral-300 flex items-center justify-between">
+      <div className="p-3 bg-neutral-50 rounded-2xl border border-dashed border-neutral-300 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <ImageIcon className="text-neutral-500" size={18} />
           <div className="text-xs">
@@ -157,7 +184,7 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
             <Trash2 size={16} />
           </button>
         ) : (
-          <label className="cursor-pointer bg-black text-white text-xs px-3 py-2 rounded-xl font-medium shadow hover:bg-neutral-800">
+          <label className="cursor-pointer bg-black text-white text-xs px-3 py-2 rounded-xl font-medium shadow hover:bg-neutral-800 whitespace-nowrap">
             Subir Logo
             <input type="file" accept="image/png, image/jpeg" className="hidden" onChange={handleCargarLogo} />
           </label>
@@ -182,16 +209,16 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
         <div className="space-y-4 pt-2 border-t border-neutral-100">
           <div>
             <label className="block text-xs font-medium text-neutral-700 mb-1">Modalidad de Cobro</label>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => setTipoCobroSeleccionado('hora')}
-                className={`flex-1 py-2 rounded-xl text-xs font-semibold border ${tipoCobroSeleccionado === 'hora' ? 'bg-black text-white border-black' : 'bg-neutral-50 text-neutral-700 border-neutral-200'}`}
+                className={`flex-1 min-w-[120px] py-2 rounded-xl text-[11px] font-semibold border leading-tight ${tipoCobroSeleccionado === 'hora' ? 'bg-black text-white border-black' : 'bg-neutral-50 text-neutral-700 border-neutral-200'}`}
               >
                 Por Hora (${clienteActual.tarifaHora}/h)
               </button>
               <button
                 onClick={() => setTipoCobroSeleccionado('contrato')}
-                className={`flex-1 py-2 rounded-xl text-xs font-semibold border ${tipoCobroSeleccionado === 'contrato' ? 'bg-black text-white border-black' : 'bg-neutral-50 text-neutral-700 border-neutral-200'}`}
+                className={`flex-1 min-w-[120px] py-2 rounded-xl text-[11px] font-semibold border leading-tight ${tipoCobroSeleccionado === 'contrato' ? 'bg-black text-white border-black' : 'bg-neutral-50 text-neutral-700 border-neutral-200'}`}
               >
                 Contrato Fijo
               </button>
