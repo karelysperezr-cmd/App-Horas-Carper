@@ -4,6 +4,22 @@ import { GeneradorFactura } from './components/GeneradorFactura';
 import type { Cliente, RegistroJornada, Factura } from './types';
 import { Clock, FileText, Users, LogOut, Plus, Briefcase } from 'lucide-react';
 
+const CLIENTES_DE_EJEMPLO = ['Intercenter Colombia', 'DICA CASTELL'];
+
+const leerDesdeStorage = <T,>(key: string, fallback: T[]): T[] => {
+  if (typeof window === 'undefined') return fallback;
+
+  const saved = window.localStorage.getItem(key);
+  if (!saved) return fallback;
+
+  try {
+    const parsed = JSON.parse(saved);
+    return Array.isArray(parsed) ? (parsed as T[]) : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
 export function App() {
   const [autenticado, setAutenticado] = useState<boolean>(false);
   const [usuario, setUsuario] = useState<string>('');
@@ -13,59 +29,30 @@ export function App() {
   const [pestanaActiva, setPestanaActiva] = useState<'fichaje' | 'facturas' | 'clientes'>('fichaje');
 
   const [clientes, setClientes] = useState<Cliente[]>(() => {
-    if (typeof window === 'undefined') return [
-      { id: '1', nombre: 'Intercenter Colombia', tarifaHora: 25, tipoCobro: 'hora' },
-      { id: '2', nombre: 'DICA CASTELL', tarifaHora: 30, tipoCobro: 'hora' }
-    ];
-
-    const saved = window.localStorage.getItem('carper-clientes');
-    if (!saved) {
-      return [
-        { id: '1', nombre: 'Intercenter Colombia', tarifaHora: 25, tipoCobro: 'hora' },
-        { id: '2', nombre: 'DICA CASTELL', tarifaHora: 30, tipoCobro: 'hora' }
-      ];
-    }
-
-    try {
-      return JSON.parse(saved) as Cliente[];
-    } catch {
-      return [
-        { id: '1', nombre: 'Intercenter Colombia', tarifaHora: 25, tipoCobro: 'hora' },
-        { id: '2', nombre: 'DICA CASTELL', tarifaHora: 30, tipoCobro: 'hora' }
-      ];
-    }
+    const guardados = leerDesdeStorage<Cliente>('carper-clientes', []);
+    return guardados.filter((cliente) => !CLIENTES_DE_EJEMPLO.includes(cliente.nombre));
   });
 
   const [registros, setRegistros] = useState<RegistroJornada[]>(() => {
-    if (typeof window === 'undefined') return [];
-
-    const saved = window.localStorage.getItem('carper-registros');
-    if (!saved) return [];
-
-    try {
-      return JSON.parse(saved) as RegistroJornada[];
-    } catch {
-      return [];
-    }
+    return leerDesdeStorage<RegistroJornada>('carper-registros', []);
   });
 
   const [facturas, setFacturas] = useState<Factura[]>(() => {
-    if (typeof window === 'undefined') return [];
-
-    const saved = window.localStorage.getItem('carper-facturas');
-    if (!saved) return [];
-
-    try {
-      return JSON.parse(saved) as Factura[];
-    } catch {
-      return [];
-    }
+    return leerDesdeStorage<Factura>('carper-facturas', []);
   });
 
   const [nuevoClienteNombre, setNuevoClienteNombre] = useState<string>('');
   const [nuevaTarifa, setNuevaTarifa] = useState<number>(20);
 
   useEffect(() => {
+    const sanitizados = clientes.filter((cliente) => !CLIENTES_DE_EJEMPLO.includes(cliente.nombre));
+
+    if (sanitizados.length !== clientes.length) {
+      setClientes(sanitizados);
+      window.localStorage.setItem('carper-clientes', JSON.stringify(sanitizados));
+      return;
+    }
+
     window.localStorage.setItem('carper-clientes', JSON.stringify(clientes));
   }, [clientes]);
 
@@ -103,16 +90,11 @@ export function App() {
   };
 
   const limpiarDatos = () => {
-    if (window.confirm('¿Deseas borrar todos los clientes, registros y facturas guardados?')) {
-      setClientes([
-        { id: '1', nombre: 'Intercenter Colombia', tarifaHora: 25, tipoCobro: 'hora' },
-        { id: '2', nombre: 'DICA CASTELL', tarifaHora: 30, tipoCobro: 'hora' }
-      ]);
+    if (window.confirm('¿Deseas limpiar solo los registros y facturas, manteniendo los clientes?')) {
       setRegistros([]);
       setFacturas([]);
-      window.localStorage.removeItem('carper-clientes');
-      window.localStorage.removeItem('carper-registros');
-      window.localStorage.removeItem('carper-facturas');
+      window.localStorage.setItem('carper-registros', JSON.stringify([]));
+      window.localStorage.setItem('carper-facturas', JSON.stringify([]));
     }
   };
 
@@ -196,7 +178,7 @@ export function App() {
         </button>
       </header>
 
-      <main className="max-w-md mx-auto px-4 pt-4 pb-20">
+      <main className="max-w-md mx-auto px-4 pt-6 pb-24">
         {pestanaActiva === 'fichaje' && (
           <Fichaje
             clientes={clientes}
@@ -258,9 +240,9 @@ export function App() {
                 <h4 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">Clientes Guardados</h4>
                 <button
                   onClick={limpiarDatos}
-                  className="text-[10px] text-rose-600 font-medium underline"
+                  className="text-[10px] text-rose-600 font-medium underline decoration-rose-300"
                 >
-                  Limpiar datos
+                  Vaciar registros y facturas (mantener clientes)
                 </button>
               </div>
               <div className="space-y-2">
@@ -278,30 +260,32 @@ export function App() {
         )}
       </main>
 
-      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-lg border-t border-neutral-200 py-2 px-4 flex justify-around items-center max-w-md mx-auto z-30 shadow-[0_-8px_30px_rgba(0,0,0,0.06)]">
-        <button
-          onClick={() => setPestanaActiva('fichaje')}
-          className={`flex flex-col items-center gap-1 transition px-2 py-1 rounded-xl ${pestanaActiva === 'fichaje' ? 'text-black font-semibold bg-neutral-100' : 'text-neutral-400 hover:text-neutral-600'}`}
-        >
-          <Clock size={20} />
-          <span className="text-[10px]">Fichaje</span>
-        </button>
+      <nav className="fixed bottom-0 left-0 right-0 z-30 border-t border-neutral-200 bg-white/95 backdrop-blur-xl shadow-[0_-8px_24px_rgba(0,0,0,0.06)]">
+        <div className="mx-auto flex max-w-md items-center justify-around px-3 py-2">
+          <button
+            onClick={() => setPestanaActiva('fichaje')}
+            className={`flex min-w-[70px] flex-col items-center gap-1 rounded-2xl px-2 py-2 text-[10px] transition ${pestanaActiva === 'fichaje' ? 'bg-black text-white shadow-sm' : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800'}`}
+          >
+            <Clock size={18} />
+            <span>Fichaje</span>
+          </button>
 
-        <button
-          onClick={() => setPestanaActiva('facturas')}
-          className={`flex flex-col items-center gap-1 transition px-2 py-1 rounded-xl ${pestanaActiva === 'facturas' ? 'text-black font-semibold bg-neutral-100' : 'text-neutral-400 hover:text-neutral-600'}`}
-        >
-          <FileText size={20} />
-          <span className="text-[10px]">Facturas</span>
-        </button>
+          <button
+            onClick={() => setPestanaActiva('facturas')}
+            className={`flex min-w-[70px] flex-col items-center gap-1 rounded-2xl px-2 py-2 text-[10px] transition ${pestanaActiva === 'facturas' ? 'bg-black text-white shadow-sm' : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800'}`}
+          >
+            <FileText size={18} />
+            <span>Facturas</span>
+          </button>
 
-        <button
-          onClick={() => setPestanaActiva('clientes')}
-          className={`flex flex-col items-center gap-1 transition px-2 py-1 rounded-xl ${pestanaActiva === 'clientes' ? 'text-black font-semibold bg-neutral-100' : 'text-neutral-400 hover:text-neutral-600'}`}
-        >
-          <Users size={20} />
-          <span className="text-[10px]">Clientes</span>
-        </button>
+          <button
+            onClick={() => setPestanaActiva('clientes')}
+            className={`flex min-w-[70px] flex-col items-center gap-1 rounded-2xl px-2 py-2 text-[10px] transition ${pestanaActiva === 'clientes' ? 'bg-black text-white shadow-sm' : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800'}`}
+          >
+            <Users size={18} />
+            <span>Clientes</span>
+          </button>
+        </div>
       </nav>
     </div>
   );
