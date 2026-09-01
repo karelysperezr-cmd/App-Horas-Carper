@@ -6,12 +6,16 @@ import jsPDF from 'jspdf';
 interface GeneradorFacturaProps {
   clientes: Cliente[];
   registros: RegistroJornada[];
+  modoDocumento: 'factura' | 'presupuesto';
+  onCambiarModoDocumento: (modo: 'factura' | 'presupuesto') => void;
   onGuardarFactura: (factura: Factura) => void;
 }
 
 export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
   clientes,
   registros,
+  modoDocumento,
+  onCambiarModoDocumento,
   onGuardarFactura
 }) => {
   const [clienteId, setClienteId] = useState<string>('');
@@ -19,14 +23,18 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
   const [montoContrato, setMontoContrato] = useState<number>(0);
   const [logoBase64, setLogoBase64] = useState<string | null>(null);
   const [mensajeExito, setMensajeExito] = useState<string>('');
+  const [destinatario, setDestinatario] = useState<string>('');
+  const [explicacionPresupuesto, setExplicacionPresupuesto] = useState<string>('');
+  const [firmaResponsable, setFirmaResponsable] = useState<string>('');
 
   const clienteActual = clientes.find(c => c.id === clienteId);
   const registrosCliente = registros.filter(r => r.clienteId === clienteId && r.completado);
 
   const totalHorasCalculadas = registrosCliente.reduce((acc, curr) => acc + curr.totalHoras, 0);
-  const montoTotal = clienteActual 
+  const montoTotal = clienteActual
     ? (tipoCobroSeleccionado === 'hora' ? totalHorasCalculadas * clienteActual.tarifaHora : montoContrato)
     : 0;
+  const esPresupuesto = modoDocumento === 'presupuesto';
 
   const handleCargarLogo = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -44,20 +52,27 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
 
     const doc = new jsPDF();
     const fechaActual = new Date().toLocaleDateString();
+    const titulo = esPresupuesto ? 'PRESUPUESTO DE SERVICIOS' : 'FACTURA DE SERVICIOS';
+    const pie = esPresupuesto
+      ? 'Este presupuesto tiene una vigencia de 7 días y puede ajustarse según cambios de alcance.'
+      : 'Gracias por confiar en nuestro trabajo. Pago preferentemente por transferencia.';
+    const destinatarioTexto = destinatario.trim() || clienteActual.nombre;
+    const explicacionTexto = explicacionPresupuesto.trim() || 'Aquí puedes detallar el alcance, condiciones y alcance del servicio solicitado.';
+    const firmaTexto = firmaResponsable.trim() || 'Nombre y cargo del responsable';
     let currentY = 20;
 
-    doc.setFillColor(245, 245, 245);
-    doc.roundedRect(14, 12, 182, 36, 3, 3, 'F');
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(14, 12, 182, 38, 3, 3, 'F');
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(16);
     doc.setTextColor(15, 23, 42);
-    doc.text('FACTURA DE SERVICIOS', 20, 24);
+    doc.text(titulo, 20, 24);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     doc.setTextColor(82, 82, 91);
     doc.text(`Cliente: ${clienteActual.nombre}`, 20, 32);
-    doc.text(`Fecha de emisión: ${fechaActual}`, 20, 39);
+    doc.text(`Fecha: ${fechaActual}`, 20, 39);
 
     if (logoBase64) {
       try {
@@ -67,9 +82,9 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
       }
     }
 
-    currentY = 56;
+    currentY = 60;
     doc.setDrawColor(226, 232, 240);
-    doc.roundedRect(14, currentY - 8, 182, 26, 3, 3, 'S');
+    doc.roundedRect(14, currentY - 8, 182, 34, 3, 3, 'S');
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
     doc.setTextColor(15, 23, 42);
@@ -79,10 +94,28 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
     doc.setTextColor(82, 82, 91);
     doc.text(`Modalidad: ${tipoCobroSeleccionado === 'hora' ? 'Pago por Hora' : 'Contrato Fijo'}`, 20, currentY + 8);
     doc.text(`Tarifa por Hora: $${clienteActual.tarifaHora}`, 20, currentY + 14);
+    doc.text(`Alcance estimado: ${registrosCliente.length} jornadas registradas`, 20, currentY + 20);
 
-    currentY = 92;
+    if (esPresupuesto) {
+      currentY = 106;
+      doc.setDrawColor(226, 232, 240);
+      doc.roundedRect(14, currentY - 8, 182, 36, 3, 3, 'S');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(15, 23, 42);
+      doc.text('Detalle del presupuesto', 20, currentY);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(82, 82, 91);
+      doc.text(`Dirigido a: ${destinatarioTexto}`, 20, currentY + 8);
+      const textoExplicacion = doc.splitTextToSize(explicacionTexto, 160);
+      doc.text(textoExplicacion, 20, currentY + 16);
+      currentY += 32;
+    }
+
+    currentY = esPresupuesto ? 152 : 104;
     doc.setDrawColor(226, 232, 240);
-    doc.roundedRect(14, currentY - 8, 182, 16, 3, 3, 'S');
+    doc.roundedRect(14, currentY - 8, 182, 18, 3, 3, 'S');
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
     doc.setTextColor(15, 23, 42);
@@ -93,8 +126,8 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
     doc.setFontSize(9);
     doc.setTextColor(15, 23, 42);
     doc.text('Fecha', 20, currentY);
-    doc.text('Horas', 78, currentY);
-    doc.text('Detalle', 112, currentY);
+    doc.text('Horas', 74, currentY);
+    doc.text('Detalle', 108, currentY);
     doc.line(18, currentY + 2, 192, currentY + 2);
     currentY += 8;
 
@@ -103,7 +136,7 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
     doc.setTextColor(51, 65, 85);
 
     registrosCliente.forEach((reg) => {
-      if (currentY > 255) {
+      if (currentY > 250) {
         doc.addPage();
         currentY = 24;
       }
@@ -111,16 +144,16 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
       const detalle = reg.actividades.length > 0
         ? reg.actividades.map((act) => `${act.tipo.toUpperCase()}: ${act.descripcion}`).join(' | ')
         : 'Sin actividades registradas';
-      const textoDetalle = doc.splitTextToSize(detalle, 72);
+      const textoDetalle = doc.splitTextToSize(detalle, 76);
 
       doc.text(reg.fecha, 20, currentY);
-      doc.text(`${reg.totalHoras}h`, 78, currentY);
-      doc.text(textoDetalle[0] || '', 112, currentY);
+      doc.text(`${reg.totalHoras}h`, 74, currentY);
+      doc.text(textoDetalle[0] || '', 108, currentY);
       currentY += Math.max(6, textoDetalle.length * 4.5);
     });
 
     currentY += 8;
-    if (currentY > 255) {
+    if (currentY > 250) {
       doc.addPage();
       currentY = 24;
     }
@@ -131,7 +164,7 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
     currentY += 10;
 
     doc.setFillColor(249, 250, 251);
-    doc.roundedRect(14, currentY - 6, 182, 28, 3, 3, 'F');
+    doc.roundedRect(14, currentY - 6, 182, 30, 3, 3, 'F');
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
     doc.setTextColor(15, 23, 42);
@@ -142,7 +175,27 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
       doc.text(`Monto por Contrato: $${montoTotal.toFixed(2)}`, 20, currentY + 4);
     }
 
-    doc.save(`Factura_${clienteActual.nombre.replace(/\s+/g, '_')}_${Date.now()}.pdf`);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(82, 82, 91);
+    const lineasPie = doc.splitTextToSize(pie, 160);
+    doc.text(lineasPie, 20, currentY + 18);
+
+    if (esPresupuesto) {
+      doc.setDrawColor(203, 213, 225);
+      doc.line(140, currentY + 34, 188, currentY + 34);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(15, 23, 42);
+      doc.text('Firma / responsable', 140, currentY + 30);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(82, 82, 91);
+      doc.text(firmaTexto, 140, currentY + 38);
+    }
+
+    const prefijo = esPresupuesto ? 'Presupuesto' : 'Factura';
+    doc.save(`${prefijo}_${clienteActual.nombre.replace(/\s+/g, '_')}_${Date.now()}.pdf`);
 
     const nuevaFactura: Factura = {
       id: Date.now().toString(),
@@ -155,15 +208,31 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
     };
     onGuardarFactura(nuevaFactura);
 
-    setMensajeExito('¡Factura generada y descargada con éxito!');
+    setMensajeExito(esPresupuesto ? '¡Presupuesto generado y descargado con éxito!' : '¡Factura generada y descargada con éxito!');
     setTimeout(() => setMensajeExito(''), 4000);
   };
 
   return (
     <div className="max-w-md mx-auto p-4 bg-white rounded-3xl border border-neutral-200 shadow-sm my-2 space-y-4">
-      <h2 className="text-xl font-bold text-neutral-900 flex items-center gap-2">
-        <FileText className="text-black" /> Generador de Facturas PDF
-      </h2>
+      <div className="flex items-start justify-between gap-2">
+        <h2 className="text-xl font-bold text-neutral-900 flex items-center gap-2">
+          <FileText className="text-black" /> {esPresupuesto ? 'Generador de Presupuestos PDF' : 'Generador de Facturas PDF'}
+        </h2>
+        <div className="flex rounded-2xl border border-neutral-200 bg-neutral-50 p-1">
+          <button
+            onClick={() => onCambiarModoDocumento('presupuesto')}
+            className={`rounded-xl px-3 py-1.5 text-[11px] font-semibold ${esPresupuesto ? 'bg-black text-white' : 'text-neutral-600'}`}
+          >
+            Presupuesto
+          </button>
+          <button
+            onClick={() => onCambiarModoDocumento('factura')}
+            className={`rounded-xl px-3 py-1.5 text-[11px] font-semibold ${!esPresupuesto ? 'bg-black text-white' : 'text-neutral-600'}`}
+          >
+            Factura
+          </button>
+        </div>
+      </div>
 
       {mensajeExito && (
         <div className="bg-emerald-50 p-3 rounded-2xl border border-emerald-200 text-xs text-emerald-800 flex items-center gap-2">
@@ -175,7 +244,7 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
         <div className="flex items-center gap-2">
           <ImageIcon className="text-neutral-500" size={18} />
           <div className="text-xs">
-            <span className="font-semibold block text-neutral-800">Logo de Factura (PNG/JPG)</span>
+            <span className="font-semibold block text-neutral-800">Logo del documento (PNG/JPG)</span>
             <span className="text-neutral-500">{logoBase64 ? 'Logo cargado' : 'Opcional'}</span>
           </div>
         </div>
@@ -204,6 +273,41 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
           ))}
         </select>
       </div>
+
+      {esPresupuesto && (
+        <div className="space-y-3 rounded-2xl border border-neutral-200 bg-neutral-50 p-3">
+          <div>
+            <label className="block text-xs font-medium text-neutral-700 mb-1">Dirigido a</label>
+            <input
+              type="text"
+              className="w-full rounded-2xl border border-neutral-200 bg-white p-2.5 text-xs"
+              placeholder="Ej. Gerencia o nombre del destinatario"
+              value={destinatario}
+              onChange={(e) => setDestinatario(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-neutral-700 mb-1">Explicación del presupuesto</label>
+            <textarea
+              rows={3}
+              className="w-full rounded-2xl border border-neutral-200 bg-white p-2.5 text-xs"
+              placeholder="Describe el alcance, condiciones y detalle del servicio"
+              value={explicacionPresupuesto}
+              onChange={(e) => setExplicacionPresupuesto(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-neutral-700 mb-1">Firma / responsable</label>
+            <input
+              type="text"
+              className="w-full rounded-2xl border border-neutral-200 bg-white p-2.5 text-xs"
+              placeholder="Ej. Nombre y cargo"
+              value={firmaResponsable}
+              onChange={(e) => setFirmaResponsable(e.target.value)}
+            />
+          </div>
+        </div>
+      )}
 
       {clienteActual && (
         <div className="space-y-4 pt-2 border-t border-neutral-100">
@@ -240,7 +344,7 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
 
           <div className="bg-neutral-50 p-4 rounded-2xl border border-neutral-200 space-y-2 text-xs">
             <div className="flex justify-between text-neutral-700">
-              <span>Jornadas sin facturar:</span>
+              <span>{esPresupuesto ? 'Jornadas incluidas:' : 'Jornadas sin facturar:'}</span>
               <span className="font-bold">{registrosCliente.length}</span>
             </div>
             <div className="flex justify-between text-neutral-700">
@@ -248,7 +352,7 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
               <span className="font-bold">{totalHorasCalculadas} hrs</span>
             </div>
             <div className="flex justify-between font-bold text-neutral-900 pt-2 border-t border-neutral-200 text-sm">
-              <span>Total a Facturar:</span>
+              <span>{esPresupuesto ? 'Total del Presupuesto:' : 'Total a Facturar:'}</span>
               <span className="text-emerald-600">${montoTotal.toFixed(2)}</span>
             </div>
           </div>
@@ -258,7 +362,7 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
             disabled={registrosCliente.length === 0}
             className="w-full bg-black hover:bg-neutral-800 text-white py-3 rounded-2xl text-xs font-medium shadow flex items-center justify-center gap-2 transition disabled:opacity-50"
           >
-            <Download size={16} /> Descargar Factura en PDF
+            <Download size={16} /> {esPresupuesto ? 'Descargar Presupuesto en PDF' : 'Descargar Factura en PDF'}
           </button>
         </div>
       )}

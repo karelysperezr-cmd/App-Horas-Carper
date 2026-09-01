@@ -1,0 +1,8 @@
+name = "control-horas-app"
+compatibility_date = "2026-09-01"
+
+[site]
+bucket = "./dist"
+
+[build]
+command = "npm run build"

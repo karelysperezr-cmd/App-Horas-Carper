@@ -1,8 +1,10 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Fichaje } from './components/Fichaje';
 import { GeneradorFactura } from './components/GeneradorFactura';
-import type { Cliente, RegistroJornada, Factura } from './types';
-import { Clock, FileText, Users, LogOut, Plus, Briefcase, Download, Upload } from 'lucide-react';
+import { FormularioSolicitudCliente } from './components/FormularioSolicitudCliente';
+import { SolicitudesCliente } from './components/SolicitudesCliente';
+import type { Cliente, RegistroJornada, Factura, SolicitudPresupuesto } from './types';
+import { Clock, FileText, Users, LogOut, Plus, Briefcase, Download, Upload, Sparkles, CalendarDays } from 'lucide-react';
 
 const CLIENTES_DE_EJEMPLO = ['Intercenter Colombia', 'DICA CASTELL'];
 const STORAGE_KEY = 'carper-app-data';
@@ -14,6 +16,7 @@ type DatosPersistidos = {
   clientes: Cliente[];
   registros: RegistroJornada[];
   facturas: Factura[];
+  solicitudes: SolicitudPresupuesto[];
   updatedAt: string;
 };
 
@@ -38,7 +41,7 @@ const leerDesdeStorage = <T,>(key: string, fallback: T[]): T[] => {
 
 const leerDatosPersistidos = (): DatosPersistidos => {
   if (typeof window === 'undefined') {
-    return crearDatosPersistidos({ clientes: [], registros: [], facturas: [] });
+    return crearDatosPersistidos({ clientes: [], registros: [], facturas: [], solicitudes: [] });
   }
 
   const fuentes = [
@@ -54,7 +57,8 @@ const leerDatosPersistidos = (): DatosPersistidos => {
         return crearDatosPersistidos({
           clientes: parsed.clientes as Cliente[],
           registros: parsed.registros as RegistroJornada[],
-          facturas: parsed.facturas as Factura[]
+          facturas: parsed.facturas as Factura[],
+          solicitudes: (parsed.solicitudes as SolicitudPresupuesto[] | undefined) ?? []
         });
       }
     } catch {
@@ -65,7 +69,8 @@ const leerDatosPersistidos = (): DatosPersistidos => {
   return crearDatosPersistidos({
     clientes: leerDesdeStorage<Cliente>('carper-clientes', []),
     registros: leerDesdeStorage<RegistroJornada>('carper-registros', []),
-    facturas: leerDesdeStorage<Factura>('carper-facturas', [])
+    facturas: leerDesdeStorage<Factura>('carper-facturas', []),
+    solicitudes: leerDesdeStorage<SolicitudPresupuesto>('carper-solicitudes', [])
   });
 };
 
@@ -79,6 +84,7 @@ const guardarDatosPersistidos = (datos: Omit<DatosPersistidos, 'updatedAt'>) => 
   window.localStorage.setItem('carper-clientes', JSON.stringify(payload.clientes));
   window.localStorage.setItem('carper-registros', JSON.stringify(payload.registros));
   window.localStorage.setItem('carper-facturas', JSON.stringify(payload.facturas));
+  window.localStorage.setItem('carper-solicitudes', JSON.stringify(payload.solicitudes));
 
   try {
     window.sessionStorage.setItem(STORAGE_KEY, texto);
@@ -140,7 +146,8 @@ export function App() {
   const [clave, setClave] = useState<string>('');
   const [errorLogin, setErrorLogin] = useState<string>('');
 
-  const [pestanaActiva, setPestanaActiva] = useState<'fichaje' | 'facturas' | 'clientes'>('fichaje');
+  const [pestanaActiva, setPestanaActiva] = useState<'fichaje' | 'facturas' | 'clientes' | 'solicitudes'>('fichaje');
+  const [modoDocumento, setModoDocumento] = useState<'factura' | 'presupuesto'>('factura');
 
   const [clientes, setClientes] = useState<Cliente[]>(() => {
     const guardados = leerDatosPersistidos();
@@ -155,6 +162,10 @@ export function App() {
     return leerDatosPersistidos().facturas;
   });
 
+  const [solicitudes, setSolicitudes] = useState<SolicitudPresupuesto[]>(() => {
+    return leerDatosPersistidos().solicitudes;
+  });
+
   const [nuevoClienteNombre, setNuevoClienteNombre] = useState<string>('');
   const [nuevaTarifa, setNuevaTarifa] = useState<number>(20);
 
@@ -163,12 +174,12 @@ export function App() {
 
     if (sanitizados.length !== clientes.length) {
       setClientes(sanitizados);
-      guardarDatosPersistidos({ clientes: sanitizados, registros, facturas });
+      guardarDatosPersistidos({ clientes: sanitizados, registros, facturas, solicitudes });
       return;
     }
 
-    guardarDatosPersistidos({ clientes, registros, facturas });
-  }, [clientes, registros, facturas]);
+    guardarDatosPersistidos({ clientes, registros, facturas, solicitudes });
+  }, [clientes, registros, facturas, solicitudes]);
 
   useEffect(() => {
     let activo = true;
@@ -182,6 +193,7 @@ export function App() {
       setClientes(clientesLimpios);
       setRegistros(datos.registros);
       setFacturas(datos.facturas);
+      setSolicitudes(datos.solicitudes ?? []);
     };
 
     void cargarDatos();
@@ -189,7 +201,7 @@ export function App() {
     if (typeof window === 'undefined') return;
 
     const onStorage = (event: StorageEvent) => {
-      if (event.key && event.key !== STORAGE_KEY && event.key !== 'carper-clientes' && event.key !== 'carper-registros' && event.key !== 'carper-facturas') {
+      if (event.key && event.key !== STORAGE_KEY && event.key !== 'carper-clientes' && event.key !== 'carper-registros' && event.key !== 'carper-facturas' && event.key !== 'carper-solicitudes') {
         return;
       }
 
@@ -198,6 +210,7 @@ export function App() {
       setClientes(clientesLimpios);
       setRegistros(datos.registros);
       setFacturas(datos.facturas);
+      setSolicitudes(datos.solicitudes ?? []);
     };
 
     window.addEventListener('storage', onStorage);
@@ -238,6 +251,32 @@ export function App() {
     );
   };
 
+  const handleEliminarRegistro = (registroId: string) => {
+    const confirmar = window.confirm('¿Seguro que deseas eliminar este registro?');
+    if (!confirmar) return;
+
+    const registroEliminado = registros.find((registro) => registro.id === registroId);
+
+    setRegistros((prev) => prev.filter((registro) => registro.id !== registroId));
+    setFacturas((prev) =>
+      prev.filter((factura) => !factura.registrosIds.includes(registroId))
+    );
+
+    if (registroEliminado) {
+      const borrador = window.localStorage.getItem('carper-draft-registro');
+      if (borrador) {
+        try {
+          const draft = JSON.parse(borrador);
+          if (draft.clienteId === registroEliminado.clienteId) {
+            window.localStorage.removeItem('carper-draft-registro');
+          }
+        } catch {
+          // Ignoramos errores al limpiar el borrador.
+        }
+      }
+    }
+  };
+
   const handleEliminarCliente = (clienteId: string) => {
     const nombreCliente = clientes.find((cliente) => cliente.id === clienteId)?.nombre || 'este cliente';
     const confirmar = window.confirm(`¿Seguro que deseas eliminar a ${nombreCliente} y todos sus registros asociados?`);
@@ -268,12 +307,12 @@ export function App() {
     if (window.confirm('¿Deseas limpiar solo los registros y facturas, manteniendo los clientes?')) {
       setRegistros([]);
       setFacturas([]);
-      guardarDatosPersistidos({ clientes, registros: [], facturas: [] });
+      guardarDatosPersistidos({ clientes, registros: [], facturas: [], solicitudes });
     }
   };
 
   const exportarDatos = () => {
-    const payload = JSON.stringify(crearDatosPersistidos({ clientes, registros, facturas }), null, 2);
+    const payload = JSON.stringify(crearDatosPersistidos({ clientes, registros, facturas, solicitudes }), null, 2);
     const blob = new Blob([payload], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -281,6 +320,30 @@ export function App() {
     link.download = `carper-backup-${new Date().toISOString().slice(0, 10)}.json`;
     link.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleAgregarSolicitud = (solicitud: SolicitudPresupuesto) => {
+    setSolicitudes((prev) => [solicitud, ...prev]);
+  };
+
+  const handleActualizarSolicitud = (
+    id: string,
+    estado: SolicitudPresupuesto['estado'],
+    reunionDetalles?: { reunionFecha?: string; reunionHora?: string; reunionNotas?: string }
+  ) => {
+    setSolicitudes((prev) =>
+      prev.map((solicitud) =>
+        solicitud.id === id
+          ? {
+              ...solicitud,
+              estado,
+              reunionFecha: reunionDetalles?.reunionFecha ?? solicitud.reunionFecha,
+              reunionHora: reunionDetalles?.reunionHora ?? solicitud.reunionHora,
+              reunionNotas: reunionDetalles?.reunionNotas ?? solicitud.reunionNotas
+            }
+          : solicitud
+      )
+    );
   };
 
   const importarDatos = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -298,13 +361,15 @@ export function App() {
       const datos = crearDatosPersistidos({
         clientes: parsed.clientes as Cliente[],
         registros: parsed.registros as RegistroJornada[],
-        facturas: parsed.facturas as Factura[]
+        facturas: parsed.facturas as Factura[],
+        solicitudes: (parsed.solicitudes as SolicitudPresupuesto[] | undefined) ?? []
       });
 
       setClientes(datos.clientes);
       setRegistros(datos.registros);
       setFacturas(datos.facturas);
-      guardarDatosPersistidos({ clientes: datos.clientes, registros: datos.registros, facturas: datos.facturas });
+      setSolicitudes(datos.solicitudes ?? []);
+      guardarDatosPersistidos({ clientes: datos.clientes, registros: datos.registros, facturas: datos.facturas, solicitudes: datos.solicitudes ?? [] });
       window.alert('Datos importados correctamente.');
     } catch {
       window.alert('No se pudo leer el archivo.');
@@ -312,6 +377,14 @@ export function App() {
       event.target.value = '';
     }
   };
+
+  const reunionesAgendadas = [...solicitudes]
+    .filter((solicitud) => solicitud.estado === 'agendado' && solicitud.reunionFecha)
+    .sort((a, b) => {
+      const fechaComparacion = (a.reunionFecha ?? '').localeCompare(b.reunionFecha ?? '');
+      if (fechaComparacion !== 0) return fechaComparacion;
+      return (a.reunionHora ?? '').localeCompare(b.reunionHora ?? '');
+    });
 
   if (!autenticado) {
     return (
@@ -402,6 +475,12 @@ export function App() {
               setRegistros((prev) => [...prev, nuevoReg]);
             }}
             onActualizarRegistro={handleActualizarRegistro}
+            onEliminarRegistro={handleEliminarRegistro}
+            onAbrirClientes={() => setPestanaActiva('clientes')}
+            onAbrirPresupuestos={() => {
+              setModoDocumento('presupuesto');
+              setPestanaActiva('facturas');
+            }}
           />
         )}
 
@@ -409,10 +488,53 @@ export function App() {
           <GeneradorFactura
             clientes={clientes}
             registros={registros}
+            modoDocumento={modoDocumento}
+            onCambiarModoDocumento={setModoDocumento}
             onGuardarFactura={(nuevaFac: Factura) => {
               setFacturas((prev) => [...prev, nuevaFac]);
             }}
           />
+        )}
+
+        {pestanaActiva === 'solicitudes' && (
+          <div className="space-y-4 my-4">
+            <FormularioSolicitudCliente onEnviarSolicitud={handleAgregarSolicitud} />
+            <SolicitudesCliente solicitudes={solicitudes} onActualizarEstado={handleActualizarSolicitud} />
+
+            <div className="rounded-3xl border border-neutral-200 bg-white p-4 shadow-sm">
+              <div className="flex items-center gap-2">
+                <CalendarDays size={16} className="text-black" />
+                <h3 className="text-sm font-semibold text-neutral-900">Agenda de reuniones</h3>
+              </div>
+
+              {reunionesAgendadas.length === 0 ? (
+                <div className="mt-3 rounded-2xl border border-dashed border-neutral-200 bg-neutral-50 p-4 text-center text-[11px] text-neutral-500">
+                  No hay reuniones agendadas todavía.
+                </div>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  {reunionesAgendadas.map((solicitud) => (
+                    <div key={solicitud.id} className="rounded-2xl border border-neutral-200 bg-neutral-50 p-3 text-[11px] text-neutral-700">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="font-semibold text-neutral-900">{solicitud.nombreCliente}</p>
+                          <p className="mt-1">{solicitud.correo}</p>
+                        </div>
+                        <span className="rounded-full bg-sky-100 px-2 py-1 text-[10px] font-semibold text-sky-700">
+                          {solicitud.reunionFecha}
+                        </span>
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <span className="rounded-full bg-white px-2 py-1">{solicitud.reunionHora}</span>
+                        <span className="rounded-full bg-white px-2 py-1">{solicitud.tipoServicio}</span>
+                      </div>
+                      {solicitud.reunionNotas && <p className="mt-2 text-neutral-600">{solicitud.reunionNotas}</p>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         )}
 
         {pestanaActiva === 'clientes' && (
@@ -514,6 +636,14 @@ export function App() {
           >
             <FileText size={18} />
             <span>Facturas</span>
+          </button>
+
+          <button
+            onClick={() => setPestanaActiva('solicitudes')}
+            className={`flex flex-1 min-w-0 flex-col items-center justify-center gap-1 rounded-2xl px-1 py-2 text-[10px] leading-tight transition ${pestanaActiva === 'solicitudes' ? 'bg-black text-white shadow-sm' : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800'}`}
+          >
+            <Sparkles size={18} />
+            <span>Solicitudes</span>
           </button>
 
           <button

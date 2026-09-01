@@ -7,6 +7,9 @@ interface FichajeProps {
   registros: RegistroJornada[];
   onGuardarRegistro: (registro: RegistroJornada) => void;
   onActualizarRegistro: (registro: RegistroJornada) => void;
+  onEliminarRegistro: (registroId: string) => void;
+  onAbrirClientes: () => void;
+  onAbrirPresupuestos: () => void;
 }
 
 interface DraftState {
@@ -19,7 +22,7 @@ interface DraftState {
   duracionHoras: number;
 }
 
-export const Fichaje: React.FC<FichajeProps> = ({ clientes, registros, onGuardarRegistro, onActualizarRegistro }) => {
+export const Fichaje: React.FC<FichajeProps> = ({ clientes, registros, onGuardarRegistro, onActualizarRegistro, onEliminarRegistro, onAbrirClientes, onAbrirPresupuestos }) => {
   const hoy = new Date().toISOString().split('T')[0];
 
   const [clienteSeleccionado, setClienteSeleccionado] = useState<string>('');
@@ -192,6 +195,27 @@ export const Fichaje: React.FC<FichajeProps> = ({ clientes, registros, onGuardar
             </p>
           </div>
 
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              onClick={() => setEtapa('entrada')}
+              className="rounded-2xl bg-black px-3 py-3 text-[11px] font-semibold text-white shadow-sm"
+            >
+              Fichar cliente
+            </button>
+            <button
+              onClick={onAbrirClientes}
+              className="rounded-2xl border border-neutral-200 bg-white px-3 py-3 text-[11px] font-semibold text-neutral-700"
+            >
+              Agregar cliente
+            </button>
+            <button
+              onClick={onAbrirPresupuestos}
+              className="rounded-2xl border border-neutral-200 bg-white px-3 py-3 text-[11px] font-semibold text-neutral-700"
+            >
+              Crear presupuesto
+            </button>
+          </div>
+
           {mensajeBorrador && (
             <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl p-3 text-xs space-y-2">
               <p>{mensajeBorrador}</p>
@@ -295,12 +319,20 @@ export const Fichaje: React.FC<FichajeProps> = ({ clientes, registros, onGuardar
                         <p className="text-sm font-semibold text-neutral-900">{cliente?.nombre || 'Cliente'}</p>
                         <p className="text-[11px] text-neutral-500">{registro.fecha} • {registro.totalHoras}h</p>
                       </div>
-                      <button
-                        onClick={() => abrirEdicionRegistro(registro)}
-                        className="flex items-center gap-1 rounded-xl border border-neutral-200 bg-white px-2.5 py-1.5 text-[10px] font-medium text-neutral-700"
-                      >
-                        <Edit3 size={12} /> Editar
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => abrirEdicionRegistro(registro)}
+                          className="flex items-center gap-1 rounded-xl border border-neutral-200 bg-white px-2.5 py-1.5 text-[10px] font-medium text-neutral-700"
+                        >
+                          <Edit3 size={12} /> Editar
+                        </button>
+                        <button
+                          onClick={() => onEliminarRegistro(registro.id)}
+                          className="rounded-xl border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[10px] font-medium text-rose-600"
+                        >
+                          Eliminar
+                        </button>
+                      </div>
                     </div>
 
                     {esEditando && registroEditando && (

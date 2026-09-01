@@ -38,3 +38,27 @@ export interface Factura {
   montoTotal: number;
   tipoCobro: 'hora' | 'contrato';
 }
+
+export interface SolicitudPresupuesto {
+  id: string;
+  nombreCliente: string;
+  correo: string;
+  tipoServicio: 'dev-ux-ui' | 'asesoria-marca' | 'marketing-audiovisual' | 'fotografia-eventos';
+  descripcionProyecto: string;
+  fechaEntrega?: string;
+  fechaEvento?: string;
+  horaEvento?: string;
+  duracionProyecto?: string;
+  duracionEvento?: string;
+  lugarEvento?: string;
+  invitados?: string;
+  problemaServicio?: string;
+  redesSociales?: string;
+  metodoPago: string;
+  moneda: 'USD' | 'VES';
+  estado: 'nuevo' | 'revisado' | 'agendado';
+  fechaSolicitud: string;
+  reunionFecha?: string;
+  reunionHora?: string;
+  reunionNotas?: string;
+}
