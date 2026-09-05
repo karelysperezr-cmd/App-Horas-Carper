@@ -71,6 +71,7 @@ export const Fichaje: React.FC<FichajeProps> = ({ clientes, registros, onGuardar
   const [descripcionEdicion, setDescripcionEdicion] = useState<string>('');
   const [filtroNotificaciones, setFiltroNotificaciones] = useState<'todas' | 'criticas' | 'advertencias'>('todas');
   const [semanaActiva, setSemanaActiva] = useState(() => obtenerInicioSemana(hoy));
+  const [mostrarSelectorFichaje, setMostrarSelectorFichaje] = useState(false);
 
   const registrosSemana = registros.filter((registro) => perteneceASemana(registro.fecha, semanaActiva));
   const totalHorasSemana = registrosSemana.reduce((acc, curr) => acc + (curr.totalHoras || 0), 0);
@@ -273,7 +274,18 @@ export const Fichaje: React.FC<FichajeProps> = ({ clientes, registros, onGuardar
 
             <div className="col-span-12 xl:col-span-7 flex items-center rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm">
               <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-3">
-                <button onClick={() => setEtapa('entrada')} className="rounded-2xl bg-black px-3 py-4 text-xs font-semibold text-white shadow-sm">Fichar cliente</button>
+                <button
+                  onClick={() => {
+                    if (clientes.length === 0) {
+                      onAbrirClientes();
+                      return;
+                    }
+                    setMostrarSelectorFichaje(true);
+                  }}
+                  className="rounded-2xl bg-black px-3 py-4 text-xs font-semibold text-white shadow-sm"
+                >
+                  Fichar cliente
+                </button>
                 <button onClick={onAbrirClientes} className="rounded-2xl border border-neutral-200 bg-white px-3 py-4 text-xs font-semibold text-neutral-700">Agregar cliente</button>
                 <button onClick={onAbrirPresupuestos} className="rounded-2xl border border-neutral-200 bg-white px-3 py-4 text-xs font-semibold text-neutral-700">Facturar horas</button>
               </div>
@@ -336,6 +348,37 @@ export const Fichaje: React.FC<FichajeProps> = ({ clientes, registros, onGuardar
             </div>
           )}
 
+          {mostrarSelectorFichaje && clientes.length > 0 && (
+            <div className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-neutral-900">Selecciona un cliente</h3>
+                  <p className="mt-1 text-[11px] text-neutral-500">El fichaje quedará asociado al cliente elegido.</p>
+                </div>
+                <button type="button" onClick={() => setMostrarSelectorFichaje(false)} className="text-xs text-neutral-500 hover:text-black">Cancelar</button>
+              </div>
+              <select
+                value={clienteSeleccionado}
+                onChange={(e) => setClienteSeleccionado(e.target.value)}
+                className="mt-4 w-full rounded-2xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-900"
+              >
+                <option value="">Selecciona un cliente</option>
+                {clientes.map((cliente) => <option key={cliente.id} value={cliente.id}>{cliente.nombre}</option>)}
+              </select>
+              <button
+                type="button"
+                disabled={!clienteSeleccionado}
+                onClick={() => {
+                  setMostrarSelectorFichaje(false);
+                  setEtapa('entrada');
+                }}
+                className="mt-3 w-full rounded-2xl bg-black px-3 py-3 text-xs font-semibold text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Continuar al fichaje
+              </button>
+            </div>
+          )}
+
           <div className="bg-white p-5 rounded-3xl border border-neutral-200 shadow-sm space-y-3">
             <div className="flex justify-between items-center">
               <h3 className="text-sm font-semibold text-neutral-900 flex items-center gap-2">
@@ -359,6 +402,7 @@ export const Fichaje: React.FC<FichajeProps> = ({ clientes, registros, onGuardar
                       <button
                         onClick={() => {
                           setClienteSeleccionado(c.id);
+                          setMostrarSelectorFichaje(false);
                           setEtapa('entrada');
                           setMensajeBorrador('');
                         }}
