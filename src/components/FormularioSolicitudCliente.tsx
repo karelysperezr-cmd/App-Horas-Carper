@@ -6,6 +6,7 @@ interface FormularioSolicitudClienteProps {
   onEnviarSolicitud: (solicitud: SolicitudPresupuesto) => void;
   className?: string;
   initialService?: SolicitudPresupuesto['tipoServicio'];
+  onSolicitudEnviada?: () => void;
 }
 
 const opcionesServicio = [
@@ -15,7 +16,7 @@ const opcionesServicio = [
   { value: 'fotografia-eventos', label: 'Fotografía / Video documental de eventos' }
 ] as const;
 
-export const FormularioSolicitudCliente: React.FC<FormularioSolicitudClienteProps> = ({ onEnviarSolicitud, className = '', initialService = 'dev-ux-ui' }) => {
+export const FormularioSolicitudCliente: React.FC<FormularioSolicitudClienteProps> = ({ onEnviarSolicitud, className = '', initialService = 'dev-ux-ui', onSolicitudEnviada }) => {
   const [nombre, setNombre] = useState('');
   const [correo, setCorreo] = useState('');
   const [tipoServicio, setTipoServicio] = useState<SolicitudPresupuesto['tipoServicio']>(initialService);
@@ -63,29 +64,7 @@ export const FormularioSolicitudCliente: React.FC<FormularioSolicitudClienteProp
     };
 
     onEnviarSolicitud(solicitud);
-    setMensajeExito('Solicitud enviada correctamente. Se abrirá tu cliente de correo para enviar una copia.');
-
-    const cuerpo = [
-      `Hola, soy ${solicitud.nombreCliente}`,
-      `Correo: ${solicitud.correo}`,
-      `Servicio: ${opcionesServicio.find((item) => item.value === solicitud.tipoServicio)?.label}`,
-      `Descripción: ${solicitud.descripcionProyecto}`,
-      solicitud.fechaEntrega ? `Fecha de entrega: ${solicitud.fechaEntrega}` : '',
-      solicitud.fechaEvento ? `Fecha del evento: ${solicitud.fechaEvento}` : '',
-      solicitud.horaEvento ? `Hora del evento: ${solicitud.horaEvento}` : '',
-      solicitud.duracionProyecto ? `Duración del proyecto: ${solicitud.duracionProyecto}` : '',
-      solicitud.duracionEvento ? `Duración del evento: ${solicitud.duracionEvento}` : '',
-      solicitud.lugarEvento ? `Lugar: ${solicitud.lugarEvento}` : '',
-      solicitud.invitados ? `Invitados: ${solicitud.invitados}` : '',
-      solicitud.problemaServicio ? `Problema: ${solicitud.problemaServicio}` : '',
-      solicitud.redesSociales ? `Redes: ${solicitud.redesSociales}` : '',
-      `Método de pago: ${solicitud.metodoPago}`,
-      `Moneda: ${solicitud.moneda}`
-    ].filter(Boolean).join('\n');
-
-    const subject = encodeURIComponent('Solicitud de presupuesto - CARPER');
-    const body = encodeURIComponent(cuerpo);
-    window.location.href = `mailto:${correo.trim()}?subject=${subject}&body=${body}`;
+    onSolicitudEnviada?.();
 
     setNombre('');
     setCorreo('');
@@ -104,12 +83,12 @@ export const FormularioSolicitudCliente: React.FC<FormularioSolicitudClienteProp
   return (
     <form onSubmit={handleSubmit} className={`space-y-3 rounded-3xl border border-neutral-200 bg-white p-4 shadow-sm ${className}`}>
       <div className="flex items-center gap-2">
-        <Sparkles size={16} className="text-black" />
+        <Sparkles size={16} className="text-[#1d1d1f]" />
         <h3 className="text-sm font-semibold text-neutral-900">Solicita tu presupuesto</h3>
       </div>
 
       {mensajeExito && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-[11px] text-emerald-800">
+        <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-3 text-[11px] text-neutral-700">
           {mensajeExito}
         </div>
       )}
@@ -240,7 +219,7 @@ export const FormularioSolicitudCliente: React.FC<FormularioSolicitudClienteProp
         </div>
       </div>
 
-      <button type="submit" className="flex w-full items-center justify-center gap-2 rounded-2xl bg-black px-3 py-2.5 text-sm font-semibold text-white">
+      <button type="submit" className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#1d1d1f] px-3 py-2.5 text-sm font-medium text-white">
         <Send size={15} /> Enviar solicitud
       </button>
 

@@ -1,7 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Fichaje } from './components/Fichaje';
 import { GeneradorFactura } from './components/GeneradorFactura';
-import { FormularioSolicitudCliente } from './components/FormularioSolicitudCliente';
 import { SolicitudesCliente } from './components/SolicitudesCliente';
 import { VistaPublica } from './components/VistaPublica';
 import type { Cliente, RegistroJornada, Factura, SolicitudPresupuesto } from './types';
@@ -505,7 +504,6 @@ export function App() {
 
         {pestanaActiva === 'solicitudes' && (
           <div className="space-y-4 my-4">
-            <FormularioSolicitudCliente onEnviarSolicitud={handleAgregarSolicitud} />
             <SolicitudesCliente solicitudes={solicitudes} onActualizarEstado={handleActualizarSolicitud} />
 
             <div className="rounded-3xl border border-neutral-200 bg-white p-4 shadow-sm">
