@@ -284,7 +284,7 @@ export const Fichaje: React.FC<FichajeProps> = ({ clientes, registros, onGuardar
                   }}
                   className="rounded-2xl bg-black px-3 py-4 text-xs font-semibold text-white shadow-sm"
                 >
-                  Fichar cliente
+                  Fichar general
                 </button>
                 <button onClick={onAbrirClientes} className="rounded-2xl border border-neutral-200 bg-white px-3 py-4 text-xs font-semibold text-neutral-700">Agregar cliente</button>
                 <button onClick={onAbrirPresupuestos} className="rounded-2xl border border-neutral-200 bg-white px-3 py-4 text-xs font-semibold text-neutral-700">Facturar horas</button>
@@ -380,15 +380,19 @@ export const Fichaje: React.FC<FichajeProps> = ({ clientes, registros, onGuardar
           )}
 
           <div className="bg-white p-5 rounded-3xl border border-neutral-200 shadow-sm space-y-3">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-sm font-semibold text-neutral-900 flex items-center gap-2">
                 <Briefcase size={16} className="text-neutral-700" /> Clientes para Visitar / Fichar
               </h3>
-              <span className="text-xs text-neutral-500">{clientes.length} activos</span>
+              <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-[10px] font-medium text-neutral-600">{clientes.length} activos</span>
             </div>
 
             <div className="space-y-2">
-              {clientes.map((c) => {
+              {clientes.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-neutral-200 bg-neutral-50 p-4 text-center text-xs text-neutral-500">
+                  Agrega un cliente para comenzar a fichar.
+                </div>
+              ) : clientes.map((c) => {
                 const historialCliente = registrosSemana.filter((r) => r.clienteId === c.id && r.completado).slice(-3);
                 const horasAcumuladas = historialCliente.reduce((acc, curr) => acc + curr.totalHoras, 0);
 
@@ -406,9 +410,9 @@ export const Fichaje: React.FC<FichajeProps> = ({ clientes, registros, onGuardar
                           setEtapa('entrada');
                           setMensajeBorrador('');
                         }}
-                        className="bg-black text-white text-xs px-3 py-2 rounded-xl font-medium shadow hover:bg-neutral-800 transition"
+                        className="flex shrink-0 items-center gap-1.5 rounded-xl bg-black px-4 py-2 text-xs font-semibold text-white shadow hover:bg-neutral-800 transition"
                       >
-                        Fichar Aquí
+                        <Clock size={13} /> Fichar
                       </button>
                     </div>
 
