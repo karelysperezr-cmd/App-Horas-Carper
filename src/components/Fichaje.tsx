@@ -22,6 +22,34 @@ interface DraftState {
   duracionHoras: number;
 }
 
+const obtenerInicioSemana = (fecha: string) => {
+  const dia = new Date(`${fecha}T12:00:00`);
+  const diaSemana = dia.getDay() || 7;
+  dia.setDate(dia.getDate() - diaSemana + 1);
+  return dia.toISOString().split('T')[0];
+};
+
+const perteneceASemana = (fecha: string, inicioSemana: string) => {
+  const inicio = new Date(`${inicioSemana}T12:00:00`);
+  const fin = new Date(inicio);
+  fin.setDate(fin.getDate() + 6);
+  const fechaRegistro = new Date(`${fecha}T12:00:00`);
+  return fechaRegistro >= inicio && fechaRegistro <= fin;
+};
+
+const moverSemana = (inicioSemana: string, semanas: number) => {
+  const fecha = new Date(`${inicioSemana}T12:00:00`);
+  fecha.setDate(fecha.getDate() + semanas * 7);
+  return fecha.toISOString().split('T')[0];
+};
+
+const etiquetaSemana = (inicioSemana: string) => {
+  const inicio = new Date(`${inicioSemana}T12:00:00`);
+  const fin = new Date(inicio);
+  fin.setDate(fin.getDate() + 6);
+  return `${inicio.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })} - ${fin.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}`;
+};
+
 export const Fichaje: React.FC<FichajeProps> = ({ clientes, registros, onGuardarRegistro, onActualizarRegistro, onEliminarRegistro, onAbrirClientes, onAbrirPresupuestos }) => {
   const hoy = new Date().toISOString().split('T')[0];
 
@@ -42,8 +70,10 @@ export const Fichaje: React.FC<FichajeProps> = ({ clientes, registros, onGuardar
   const [registroEditando, setRegistroEditando] = useState<RegistroJornada | null>(null);
   const [descripcionEdicion, setDescripcionEdicion] = useState<string>('');
   const [filtroNotificaciones, setFiltroNotificaciones] = useState<'todas' | 'criticas' | 'advertencias'>('todas');
+  const [semanaActiva, setSemanaActiva] = useState(() => obtenerInicioSemana(hoy));
 
-  const totalHorasSemana = registros.reduce((acc, curr) => acc + (curr.totalHoras || 0), 0);
+  const registrosSemana = registros.filter((registro) => perteneceASemana(registro.fecha, semanaActiva));
+  const totalHorasSemana = registrosSemana.reduce((acc, curr) => acc + (curr.totalHoras || 0), 0);
   const progresoCiclo = Math.min(100, Math.round((totalHorasSemana / 40) * 100));
 
   const notificaciones = [
@@ -210,14 +240,17 @@ export const Fichaje: React.FC<FichajeProps> = ({ clientes, registros, onGuardar
       {etapa === 'inicio' && (
         <div className="space-y-4">
           <div className="grid grid-cols-12 gap-4 xl:gap-6">
-            <div className="col-span-12 xl:col-span-4 rounded-3xl bg-black p-5 text-white shadow-xl space-y-4">
+            <div className="col-span-12 xl:col-span-5 rounded-3xl bg-black p-5 text-white shadow-xl space-y-4">
               <div className="flex justify-between items-center">
                 <span className="text-xs uppercase tracking-wider text-neutral-400 font-semibold flex items-center gap-1.5">
                   <TrendingUp size={14} /> Progreso del ciclo
                 </span>
-                <span className="text-xs bg-neutral-800 text-neutral-300 px-2.5 py-1 rounded-full">
-                  Meta 40h
-                </span>
+                <span className="text-xs bg-neutral-800 text-neutral-300 px-2.5 py-1 rounded-full">Semana activa</span>
+              </div>
+              <div className="flex items-center justify-between gap-2 rounded-2xl border border-neutral-800 bg-neutral-900/70 p-2">
+                <button onClick={() => setSemanaActiva(moverSemana(semanaActiva, -1))} className="rounded-xl px-3 py-1 text-xs text-neutral-300 hover:bg-neutral-800">Anterior</button>
+                <span className="text-xs font-medium text-white">{etiquetaSemana(semanaActiva)}</span>
+                <button onClick={() => setSemanaActiva(moverSemana(semanaActiva, 1))} className="rounded-xl px-3 py-1 text-xs text-neutral-300 hover:bg-neutral-800">Siguiente</button>
               </div>
               <div className="flex items-baseline gap-2">
                 <h2 className="text-4xl font-bold tracking-tight">{totalHorasSemana}</h2>
@@ -233,40 +266,32 @@ export const Fichaje: React.FC<FichajeProps> = ({ clientes, registros, onGuardar
                 </div>
                 <div className="flex items-center justify-between rounded-2xl border border-neutral-800 bg-neutral-900/70 px-3 py-2">
                   <span>Jornadas cerradas</span>
-                  <span className="font-semibold text-white">{registros.length}</span>
+                  <span className="font-semibold text-white">{registrosSemana.length}</span>
                 </div>
               </div>
             </div>
 
-            <div className="col-span-12 xl:col-span-8 rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm space-y-4">
+            <div className="col-span-12 xl:col-span-7 flex items-center rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm">
+              <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-3">
+                <button onClick={() => setEtapa('entrada')} className="rounded-2xl bg-black px-3 py-4 text-xs font-semibold text-white shadow-sm">Fichar cliente</button>
+                <button onClick={onAbrirClientes} className="rounded-2xl border border-neutral-200 bg-white px-3 py-4 text-xs font-semibold text-neutral-700">Agregar cliente</button>
+                <button onClick={onAbrirPresupuestos} className="rounded-2xl border border-neutral-200 bg-white px-3 py-4 text-xs font-semibold text-neutral-700">Facturar horas</button>
+              </div>
+            </div>
+          </div>
+
+          <details className="rounded-2xl border border-neutral-200 bg-white shadow-sm">
+            <summary className="cursor-pointer list-none px-4 py-3 text-xs font-semibold text-neutral-700">Notificaciones <span className="ml-1 font-normal text-neutral-400">(3)</span></summary>
+            <div className="space-y-3 border-t border-neutral-100 p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-semibold text-neutral-900">Notificaciones</h3>
-                  <p className="text-[11px] text-neutral-500">Alertas y pendientes del día.</p>
-                </div>
+                <p className="text-[11px] text-neutral-500">Alertas y pendientes del día.</p>
                 <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => setFiltroNotificaciones('todas')}
-                    className={`rounded-full px-3 py-1.5 text-[11px] font-medium transition ${filtroNotificaciones === 'todas' ? 'bg-black text-white' : 'bg-neutral-100 text-neutral-600'}`}
-                  >
-                    Todas
-                  </button>
-                  <button
-                    onClick={() => setFiltroNotificaciones('criticas')}
-                    className={`rounded-full px-3 py-1.5 text-[11px] font-medium transition ${filtroNotificaciones === 'criticas' ? 'bg-rose-600 text-white' : 'bg-neutral-100 text-neutral-600'}`}
-                  >
-                    Críticas
-                  </button>
-                  <button
-                    onClick={() => setFiltroNotificaciones('advertencias')}
-                    className={`rounded-full px-3 py-1.5 text-[11px] font-medium transition ${filtroNotificaciones === 'advertencias' ? 'bg-amber-500 text-white' : 'bg-neutral-100 text-neutral-600'}`}
-                  >
-                    Advertencias
-                  </button>
+                  <button onClick={() => setFiltroNotificaciones('todas')} className={`rounded-full px-3 py-1.5 text-[11px] font-medium transition ${filtroNotificaciones === 'todas' ? 'bg-black text-white' : 'bg-neutral-100 text-neutral-600'}`}>Todas</button>
+                  <button onClick={() => setFiltroNotificaciones('criticas')} className={`rounded-full px-3 py-1.5 text-[11px] font-medium transition ${filtroNotificaciones === 'criticas' ? 'bg-rose-600 text-white' : 'bg-neutral-100 text-neutral-600'}`}>Críticas</button>
+                  <button onClick={() => setFiltroNotificaciones('advertencias')} className={`rounded-full px-3 py-1.5 text-[11px] font-medium transition ${filtroNotificaciones === 'advertencias' ? 'bg-amber-500 text-white' : 'bg-neutral-100 text-neutral-600'}`}>Advertencias</button>
                 </div>
               </div>
-
-              <ul className="space-y-2">
+              <ul className="grid gap-2 lg:grid-cols-3">
                 {notificacionesFiltradas.map((item) => {
                   const severidadClasses = item.severidad === 'Crítica'
                     ? 'bg-rose-50 text-rose-700 border border-rose-200'
@@ -293,28 +318,7 @@ export const Fichaje: React.FC<FichajeProps> = ({ clientes, registros, onGuardar
                 })}
               </ul>
             </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-2">
-            <button
-              onClick={() => setEtapa('entrada')}
-              className="rounded-2xl bg-black px-3 py-3 text-[11px] font-semibold text-white shadow-sm"
-            >
-              Fichar cliente
-            </button>
-            <button
-              onClick={onAbrirClientes}
-              className="rounded-2xl border border-neutral-200 bg-white px-3 py-3 text-[11px] font-semibold text-neutral-700"
-            >
-              Agregar cliente
-            </button>
-            <button
-              onClick={onAbrirPresupuestos}
-              className="rounded-2xl border border-neutral-200 bg-white px-3 py-3 text-[11px] font-semibold text-neutral-700"
-            >
-              Crear presupuesto
-            </button>
-          </div>
+          </details>
 
           {mensajeBorrador && (
             <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl p-3 text-xs space-y-2">
@@ -342,7 +346,7 @@ export const Fichaje: React.FC<FichajeProps> = ({ clientes, registros, onGuardar
 
             <div className="space-y-2">
               {clientes.map((c) => {
-                const historialCliente = registros.filter((r) => r.clienteId === c.id && r.completado).slice(-3);
+                const historialCliente = registrosSemana.filter((r) => r.clienteId === c.id && r.completado).slice(-3);
                 const horasAcumuladas = historialCliente.reduce((acc, curr) => acc + curr.totalHoras, 0);
 
                 return (
@@ -404,11 +408,11 @@ export const Fichaje: React.FC<FichajeProps> = ({ clientes, registros, onGuardar
               <h3 className="text-sm font-semibold text-neutral-900 flex items-center gap-2">
                 <Clock size={16} className="text-neutral-700" /> Registros Recientes
               </h3>
-              <span className="text-xs text-neutral-500">{registros.filter((r) => r.completado).length} en total</span>
+              <span className="text-xs text-neutral-500">{registrosSemana.filter((r) => r.completado).length} esta semana</span>
             </div>
 
             <div className="space-y-2">
-              {registros.filter((r) => r.completado).slice().reverse().map((registro) => {
+              {registrosSemana.filter((r) => r.completado).slice().reverse().map((registro) => {
                 const cliente = clientes.find((c) => c.id === registro.clienteId);
                 const esEditando = registroEditandoId === registro.id;
 

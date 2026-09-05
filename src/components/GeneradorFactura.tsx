@@ -27,11 +27,13 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
   const [destinatario, setDestinatario] = useState<string>('');
   const [explicacionPresupuesto, setExplicacionPresupuesto] = useState<string>('');
   const [firmaResponsable, setFirmaResponsable] = useState<string>('');
+  const [registrosSeleccionados, setRegistrosSeleccionados] = useState<string[]>([]);
 
   const clienteActual = clientes.find(c => c.id === clienteId);
   const registrosCliente = registros.filter(r => r.clienteId === clienteId && r.completado);
+  const registrosParaDocumento = registrosCliente.filter((registro) => registrosSeleccionados.includes(registro.id));
 
-  const totalHorasCalculadas = registrosCliente.reduce((acc, curr) => acc + curr.totalHoras, 0);
+  const totalHorasCalculadas = registrosParaDocumento.reduce((acc, curr) => acc + curr.totalHoras, 0);
   const montoTotal = clienteActual
     ? (tipoCobroSeleccionado === 'hora' ? totalHorasCalculadas * clienteActual.tarifaHora : montoContrato)
     : 0;
@@ -136,7 +138,7 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
     doc.setFontSize(8);
     doc.setTextColor(51, 65, 85);
 
-    registrosCliente.forEach((reg) => {
+    registrosParaDocumento.forEach((reg) => {
       if (currentY > 250) {
         doc.addPage();
         currentY = 24;
@@ -202,7 +204,7 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
       id: Date.now().toString(),
       clienteId,
       fechaEmision: fechaActual,
-      registrosIds: registrosCliente.map((r) => r.id),
+      registrosIds: registrosParaDocumento.map((r) => r.id),
       totalHoras: totalHorasCalculadas,
       montoTotal,
       tipoCobro: tipoCobroSeleccionado
@@ -219,7 +221,7 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
     try {
       const detalle = esPresupuesto
         ? (explicacionPresupuesto.trim() || 'Alcance y condiciones del servicio solicitado.')
-        : `Servicio prestado en ${registrosCliente.length} jornadas registradas.`;
+        : `Servicio prestado en ${registrosParaDocumento.length} jornadas registradas.`;
       await generarPresupuestoPDF({
         cliente: destinatario.trim() || clienteActual.nombre,
         titulo: esPresupuesto ? 'Presupuesto de servicios' : 'Factura de servicios',
@@ -234,7 +236,7 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
         id: Date.now().toString(),
         clienteId,
         fechaEmision: new Date().toLocaleDateString('es-ES'),
-        registrosIds: registrosCliente.map((registro) => registro.id),
+        registrosIds: registrosParaDocumento.map((registro) => registro.id),
         totalHoras: totalHorasCalculadas,
         montoTotal,
         tipoCobro: tipoCobroSeleccionado
@@ -299,7 +301,11 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
         <select 
           className="w-full p-3 border border-neutral-200 rounded-2xl bg-neutral-50 text-neutral-900 text-xs"
           value={clienteId}
-          onChange={(e) => setClienteId(e.target.value)}
+          onChange={(e) => {
+            const nuevoClienteId = e.target.value;
+            setClienteId(nuevoClienteId);
+            setRegistrosSeleccionados(registros.filter((registro) => registro.clienteId === nuevoClienteId && registro.completado).map((registro) => registro.id));
+          }}
         >
           <option value="">-- Elige un cliente --</option>
           {clientes.map(c => (
@@ -344,6 +350,31 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
       )}
 
       {clienteActual && (
+        <div className="space-y-3 rounded-2xl border border-neutral-200 bg-white p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-xs font-semibold text-neutral-900">Horas a incluir</p>
+              <p className="text-[10px] text-neutral-500">Selecciona las jornadas que deseas cobrar.</p>
+            </div>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setRegistrosSeleccionados(registrosCliente.map((registro) => registro.id))} className="text-[10px] font-medium text-neutral-700 underline">Todas</button>
+              <button type="button" onClick={() => setRegistrosSeleccionados([])} className="text-[10px] font-medium text-neutral-500 underline">Ninguna</button>
+            </div>
+          </div>
+          <div className="max-h-48 space-y-2 overflow-y-auto">
+            {registrosCliente.length === 0 ? (
+              <p className="rounded-xl bg-neutral-50 p-3 text-[11px] text-neutral-500">Este cliente todavía no tiene jornadas completadas.</p>
+            ) : registrosCliente.map((registro) => (
+              <label key={registro.id} className="flex cursor-pointer items-start gap-3 rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-xs transition hover:border-neutral-400">
+                <input type="checkbox" checked={registrosSeleccionados.includes(registro.id)} onChange={() => setRegistrosSeleccionados((actuales) => actuales.includes(registro.id) ? actuales.filter((id) => id !== registro.id) : [...actuales, registro.id])} className="mt-0.5 h-4 w-4 accent-black" />
+                <span className="flex-1"><span className="block font-semibold text-neutral-900">{registro.fecha}</span><span className="text-[11px] text-neutral-500">{registro.totalHoras} horas · {registro.actividades.length} actividades</span></span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {clienteActual && (
         <div className="space-y-4 pt-2 border-t border-neutral-100">
           <div>
             <label className="block text-xs font-medium text-neutral-700 mb-1">Modalidad de Cobro</label>
@@ -379,7 +410,7 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
           <div className="bg-neutral-50 p-4 rounded-2xl border border-neutral-200 space-y-2 text-xs">
             <div className="flex justify-between text-neutral-700">
               <span>{esPresupuesto ? 'Jornadas incluidas:' : 'Jornadas sin facturar:'}</span>
-              <span className="font-bold">{registrosCliente.length}</span>
+              <span className="font-bold">{registrosParaDocumento.length}</span>
             </div>
             <div className="flex justify-between text-neutral-700">
               <span>Total Horas Acumuladas:</span>
@@ -393,7 +424,7 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
 
           <button
             onClick={generarPDF}
-            disabled={registrosCliente.length === 0}
+            disabled={registrosParaDocumento.length === 0}
             className="w-full bg-black hover:bg-neutral-800 text-white py-3 rounded-2xl text-xs font-medium shadow flex items-center justify-center gap-2 transition disabled:opacity-50"
           >
             <Download size={16} /> {esPresupuesto ? 'Descargar Presupuesto en PDF' : 'Descargar Factura en PDF'}
