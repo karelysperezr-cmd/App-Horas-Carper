@@ -3,6 +3,7 @@ import { Fichaje } from './components/Fichaje';
 import { GeneradorFactura } from './components/GeneradorFactura';
 import { FormularioSolicitudCliente } from './components/FormularioSolicitudCliente';
 import { SolicitudesCliente } from './components/SolicitudesCliente';
+import { VistaPublica } from './components/VistaPublica';
 import type { Cliente, RegistroJornada, Factura, SolicitudPresupuesto } from './types';
 import { Clock, FileText, Users, LogOut, Plus, Briefcase, Download, Upload, Sparkles, CalendarDays } from 'lucide-react';
 
@@ -145,6 +146,7 @@ export function App() {
   const [usuario, setUsuario] = useState<string>('');
   const [clave, setClave] = useState<string>('');
   const [errorLogin, setErrorLogin] = useState<string>('');
+  const [mostrarLogin, setMostrarLogin] = useState(false);
 
   const [pestanaActiva, setPestanaActiva] = useState<'fichaje' | 'facturas' | 'clientes' | 'solicitudes'>('fichaje');
   const [modoDocumento, setModoDocumento] = useState<'factura' | 'presupuesto'>('factura');
@@ -386,6 +388,10 @@ export function App() {
       return (a.reunionHora ?? '').localeCompare(b.reunionHora ?? '');
     });
 
+  if (!autenticado && !mostrarLogin) {
+    return <VistaPublica onEnviarSolicitud={handleAgregarSolicitud} onAcceder={() => setMostrarLogin(true)} />;
+  }
+
   if (!autenticado) {
     return (
       <div className="min-h-screen bg-black flex flex-col justify-center items-center p-6 text-white font-sans antialiased">
@@ -435,6 +441,7 @@ export function App() {
               Iniciar Sesión
             </button>
           </form>
+          <button type="button" onClick={() => setMostrarLogin(false)} className="w-full text-xs font-medium text-neutral-400 transition hover:text-white">Volver a la vista pública</button>
           <p className="text-[10px] text-center text-neutral-600">Sistema Local Seguro • iPhone 12 Optimized</p>
         </div>
       </div>
@@ -443,7 +450,7 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-[#FBFBFD] text-neutral-900 font-sans antialiased pb-28">
-      <header className="sticky top-0 z-30 bg-white/85 backdrop-blur-md border-b border-neutral-200 px-4 py-3.5 flex justify-between items-center max-w-md mx-auto">
+      <header className="sticky top-0 z-30 bg-white/85 backdrop-blur-md border-b border-neutral-200 px-4 py-3.5 flex justify-between items-center max-w-7xl mx-auto">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-black rounded-full flex items-center justify-center overflow-hidden border border-neutral-200">
             <img
@@ -466,7 +473,7 @@ export function App() {
         </button>
       </header>
 
-      <main className="max-w-md mx-auto px-4 pt-6 pb-24">
+      <main className="max-w-7xl mx-auto px-4 pt-6 pb-24 lg:px-8">
         {pestanaActiva === 'fichaje' && (
           <Fichaje
             clientes={clientes}
@@ -621,7 +628,7 @@ export function App() {
       </main>
 
       <nav className="fixed bottom-0 left-0 right-0 z-30 border-t border-neutral-200 bg-white/95 backdrop-blur-xl shadow-[0_-8px_24px_rgba(0,0,0,0.06)]">
-        <div className="mx-auto flex max-w-md items-center justify-around px-3 py-2">
+        <div className="mx-auto flex max-w-7xl items-center justify-around px-3 py-2">
           <button
             onClick={() => setPestanaActiva('fichaje')}
             className={`flex flex-1 min-w-0 flex-col items-center justify-center gap-1 rounded-2xl px-1 py-2 text-[10px] leading-tight transition ${pestanaActiva === 'fichaje' ? 'bg-black text-white shadow-sm' : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800'}`}

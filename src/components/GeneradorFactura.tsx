@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { FileText, Download, Image as ImageIcon, CheckCircle2, Trash2 } from 'lucide-react';
 import type { Cliente, RegistroJornada, Factura } from '../types';
 import jsPDF from 'jspdf';
+import { generarPresupuestoPDF } from '../utils/generarPresupuestoPDF';
 
 interface GeneradorFacturaProps {
   clientes: Cliente[];
@@ -47,7 +48,7 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
     }
   };
 
-  const generarPDF = () => {
+  const generarPDFLegacy = () => {
     if (!clienteActual) return;
 
     const doc = new jsPDF();
@@ -210,6 +211,39 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
 
     setMensajeExito(esPresupuesto ? '¡Presupuesto generado y descargado con éxito!' : '¡Factura generada y descargada con éxito!');
     setTimeout(() => setMensajeExito(''), 4000);
+  };
+
+  const generarPDF = async () => {
+    if (!clienteActual) return;
+
+    try {
+      const detalle = esPresupuesto
+        ? (explicacionPresupuesto.trim() || 'Alcance y condiciones del servicio solicitado.')
+        : `Servicio prestado en ${registrosCliente.length} jornadas registradas.`;
+      await generarPresupuestoPDF({
+        cliente: destinatario.trim() || clienteActual.nombre,
+        titulo: esPresupuesto ? 'Presupuesto de servicios' : 'Factura de servicios',
+        fecha: new Date().toLocaleDateString('es-ES'),
+        servicio: esPresupuesto ? 'Propuesta personalizada' : 'Servicios profesionales',
+        descripcion: detalle,
+        total: montoTotal,
+        logo: logoBase64
+      });
+
+      onGuardarFactura({
+        id: Date.now().toString(),
+        clienteId,
+        fechaEmision: new Date().toLocaleDateString('es-ES'),
+        registrosIds: registrosCliente.map((registro) => registro.id),
+        totalHoras: totalHorasCalculadas,
+        montoTotal,
+        tipoCobro: tipoCobroSeleccionado
+      });
+      setMensajeExito(esPresupuesto ? '¡Presupuesto generado y descargado con éxito!' : '¡Factura generada y descargada con éxito!');
+      setTimeout(() => setMensajeExito(''), 4000);
+    } catch {
+      generarPDFLegacy();
+    }
   };
 
   return (

@@ -5,6 +5,7 @@ import type { SolicitudPresupuesto } from '../types';
 interface FormularioSolicitudClienteProps {
   onEnviarSolicitud: (solicitud: SolicitudPresupuesto) => void;
   className?: string;
+  initialService?: SolicitudPresupuesto['tipoServicio'];
 }
 
 const opcionesServicio = [
@@ -14,10 +15,10 @@ const opcionesServicio = [
   { value: 'fotografia-eventos', label: 'Fotografía / Video documental de eventos' }
 ] as const;
 
-export const FormularioSolicitudCliente: React.FC<FormularioSolicitudClienteProps> = ({ onEnviarSolicitud, className = '' }) => {
+export const FormularioSolicitudCliente: React.FC<FormularioSolicitudClienteProps> = ({ onEnviarSolicitud, className = '', initialService = 'dev-ux-ui' }) => {
   const [nombre, setNombre] = useState('');
   const [correo, setCorreo] = useState('');
-  const [tipoServicio, setTipoServicio] = useState<SolicitudPresupuesto['tipoServicio']>('dev-ux-ui');
+  const [tipoServicio, setTipoServicio] = useState<SolicitudPresupuesto['tipoServicio']>(initialService);
   const [descripcionProyecto, setDescripcionProyecto] = useState('');
   const [fechaEntrega, setFechaEntrega] = useState('');
   const [fechaEvento, setFechaEvento] = useState('');

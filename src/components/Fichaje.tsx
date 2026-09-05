@@ -41,8 +41,40 @@ export const Fichaje: React.FC<FichajeProps> = ({ clientes, registros, onGuardar
   const [registroEditandoId, setRegistroEditandoId] = useState<string | null>(null);
   const [registroEditando, setRegistroEditando] = useState<RegistroJornada | null>(null);
   const [descripcionEdicion, setDescripcionEdicion] = useState<string>('');
+  const [filtroNotificaciones, setFiltroNotificaciones] = useState<'todas' | 'criticas' | 'advertencias'>('todas');
 
   const totalHorasSemana = registros.reduce((acc, curr) => acc + (curr.totalHoras || 0), 0);
+  const progresoCiclo = Math.min(100, Math.round((totalHorasSemana / 40) * 100));
+
+  const notificaciones = [
+    {
+      id: '1',
+      titulo: 'Revisión de presupuesto pendiente',
+      descripcion: 'El cliente Intercenter necesita confirmar el alcance antes de cerrar la propuesta.',
+      severidad: 'Crítica' as const,
+      sinLeer: true
+    },
+    {
+      id: '2',
+      titulo: 'Fichaje incompleto',
+      descripcion: 'Hay un registro sin finalizar en la jornada del cliente DICA CASTELL.',
+      severidad: 'Advertencia' as const,
+      sinLeer: true
+    },
+    {
+      id: '3',
+      titulo: 'Actualización de agenda',
+      descripcion: 'La reunión con el equipo de producción se ha movido a las 16:30.',
+      severidad: 'Informativa' as const,
+      sinLeer: false
+    }
+  ];
+
+  const notificacionesFiltradas = notificaciones.filter((item) => {
+    if (filtroNotificaciones === 'criticas') return item.severidad === 'Crítica';
+    if (filtroNotificaciones === 'advertencias') return item.severidad === 'Advertencia';
+    return true;
+  });
 
   useEffect(() => {
     const savedDraft = window.localStorage.getItem('carper-draft-registro');
@@ -174,25 +206,93 @@ export const Fichaje: React.FC<FichajeProps> = ({ clientes, registros, onGuardar
   };
 
   return (
-    <div className="max-w-md mx-auto p-4 space-y-4 my-2">
+    <div className="w-full p-4 space-y-4 my-2">
       {etapa === 'inicio' && (
         <div className="space-y-4">
-          <div className="bg-black text-white p-5 rounded-3xl shadow-xl space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-xs uppercase tracking-wider text-neutral-400 font-semibold flex items-center gap-1.5">
-                <TrendingUp size={14} /> Resumen Semanal
-              </span>
-              <span className="text-xs bg-neutral-800 text-neutral-300 px-2.5 py-1 rounded-full">
-                Esta Semana
-              </span>
+          <div className="grid grid-cols-12 gap-4 xl:gap-6">
+            <div className="col-span-12 xl:col-span-4 rounded-3xl bg-black p-5 text-white shadow-xl space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="text-xs uppercase tracking-wider text-neutral-400 font-semibold flex items-center gap-1.5">
+                  <TrendingUp size={14} /> Progreso del ciclo
+                </span>
+                <span className="text-xs bg-neutral-800 text-neutral-300 px-2.5 py-1 rounded-full">
+                  Meta 40h
+                </span>
+              </div>
+              <div className="flex items-baseline gap-2">
+                <h2 className="text-4xl font-bold tracking-tight">{totalHorasSemana}</h2>
+                <span className="text-sm text-neutral-400 font-medium">horas registradas</span>
+              </div>
+              <div className="h-2 rounded-full bg-neutral-800">
+                <div className="h-2 rounded-full bg-emerald-400" style={{ width: `${progresoCiclo}%` }} />
+              </div>
+              <div className="grid gap-2 text-xs text-neutral-300">
+                <div className="flex items-center justify-between rounded-2xl border border-neutral-800 bg-neutral-900/70 px-3 py-2">
+                  <span>Avance del ciclo</span>
+                  <span className="font-semibold text-white">{progresoCiclo}%</span>
+                </div>
+                <div className="flex items-center justify-between rounded-2xl border border-neutral-800 bg-neutral-900/70 px-3 py-2">
+                  <span>Jornadas cerradas</span>
+                  <span className="font-semibold text-white">{registros.length}</span>
+                </div>
+              </div>
             </div>
-            <div className="flex items-baseline gap-2">
-              <h2 className="text-4xl font-bold tracking-tight">{totalHorasSemana}</h2>
-              <span className="text-sm text-neutral-400 font-medium">horas registradas</span>
+
+            <div className="col-span-12 xl:col-span-8 rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-neutral-900">Notificaciones</h3>
+                  <p className="text-[11px] text-neutral-500">Alertas y pendientes del día.</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setFiltroNotificaciones('todas')}
+                    className={`rounded-full px-3 py-1.5 text-[11px] font-medium transition ${filtroNotificaciones === 'todas' ? 'bg-black text-white' : 'bg-neutral-100 text-neutral-600'}`}
+                  >
+                    Todas
+                  </button>
+                  <button
+                    onClick={() => setFiltroNotificaciones('criticas')}
+                    className={`rounded-full px-3 py-1.5 text-[11px] font-medium transition ${filtroNotificaciones === 'criticas' ? 'bg-rose-600 text-white' : 'bg-neutral-100 text-neutral-600'}`}
+                  >
+                    Críticas
+                  </button>
+                  <button
+                    onClick={() => setFiltroNotificaciones('advertencias')}
+                    className={`rounded-full px-3 py-1.5 text-[11px] font-medium transition ${filtroNotificaciones === 'advertencias' ? 'bg-amber-500 text-white' : 'bg-neutral-100 text-neutral-600'}`}
+                  >
+                    Advertencias
+                  </button>
+                </div>
+              </div>
+
+              <ul className="space-y-2">
+                {notificacionesFiltradas.map((item) => {
+                  const severidadClasses = item.severidad === 'Crítica'
+                    ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                    : item.severidad === 'Advertencia'
+                      ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                      : 'bg-sky-50 text-sky-700 border border-sky-200';
+
+                  return (
+                    <li key={item.id} className="rounded-2xl border border-border bg-surface p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold ${severidadClasses}`}>
+                          {item.severidad}
+                        </span>
+                        <span className="flex items-center gap-2 text-[10px] font-medium text-neutral-500">
+                          {item.sinLeer ? <span className="h-2.5 w-2.5 rounded-full bg-rose-500" aria-label="Sin leer" /> : <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" aria-label="Leída" />}
+                        </span>
+                      </div>
+                      <div className="mt-2">
+                        <p className="text-sm font-semibold text-neutral-900">{item.titulo}</p>
+                        <p className="mt-1 text-[11px] text-neutral-600">{item.descripcion}</p>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
             </div>
-            <p className="text-xs text-neutral-400">
-              {registros.length} jornadas completadas con éxito en tus clientes.
-            </p>
           </div>
 
           <div className="grid grid-cols-3 gap-2">
