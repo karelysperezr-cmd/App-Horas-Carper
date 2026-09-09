@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "deploy:cloudflare": "npx wrangler pages deploy --force ./dist --project-name=control-horas-app"
+    "deploy:cloudflare": "npx wrangler pages deploy ./dist --project-name=control-horas-app"
   },
   "dependencies": {
     "html2canvas": "^1.4.1",
