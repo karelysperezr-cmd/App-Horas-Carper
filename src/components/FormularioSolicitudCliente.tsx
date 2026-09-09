@@ -19,10 +19,12 @@ const opcionesServicio = [
 export const FormularioSolicitudCliente: React.FC<FormularioSolicitudClienteProps> = ({ onEnviarSolicitud, className = '', initialService = 'dev-ux-ui', onSolicitudEnviada }) => {
   const [nombre, setNombre] = useState('');
   const [correo, setCorreo] = useState('');
+  const [telefono, setTelefono] = useState('');
   const [tipoServicio, setTipoServicio] = useState<SolicitudPresupuesto['tipoServicio']>(initialService);
   const [descripcionProyecto, setDescripcionProyecto] = useState('');
   const [fechaEntrega, setFechaEntrega] = useState('');
   const [fechaEvento, setFechaEvento] = useState('');
+  const [fechaAsesoria, setFechaAsesoria] = useState('');
   const [horaEvento, setHoraEvento] = useState('');
   const [duracionProyecto, setDuracionProyecto] = useState('');
   const [duracionEvento, setDuracionEvento] = useState('');
@@ -37,8 +39,12 @@ export const FormularioSolicitudCliente: React.FC<FormularioSolicitudClienteProp
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!nombre.trim() || !correo.trim() || !descripcionProyecto.trim()) {
-      setMensajeExito('Por favor completa tu nombre, correo y una descripción breve del proyecto.');
+    const descripcionRequerida = tipoServicio === 'asesoria-marca'
+      ? problemaServicio.trim()
+      : descripcionProyecto.trim();
+
+    if (!nombre.trim() || !correo.trim() || !telefono.trim() || !descripcionRequerida) {
+      setMensajeExito('Por favor completa tu nombre, correo, teléfono y una descripción breve del proyecto o asesoría.');
       return;
     }
 
@@ -46,16 +52,18 @@ export const FormularioSolicitudCliente: React.FC<FormularioSolicitudClienteProp
       id: Date.now().toString(),
       nombreCliente: nombre.trim(),
       correo: correo.trim(),
+      telefono: telefono.trim() || undefined,
       tipoServicio,
-      descripcionProyecto: descripcionProyecto.trim(),
+      descripcionProyecto: descripcionRequerida,
       fechaEntrega: fechaEntrega || undefined,
       fechaEvento: fechaEvento || undefined,
+      fechaAsesoria: fechaAsesoria || undefined,
       horaEvento: horaEvento || undefined,
       duracionProyecto: duracionProyecto || undefined,
       duracionEvento: duracionEvento || undefined,
       lugarEvento: lugarEvento || undefined,
       invitados: invitados || undefined,
-      problemaServicio: problemaServicio || undefined,
+      problemaServicio: tipoServicio === 'asesoria-marca' ? problemaServicio.trim() : problemaServicio || undefined,
       redesSociales: redesSociales || undefined,
       metodoPago,
       moneda,
@@ -68,9 +76,11 @@ export const FormularioSolicitudCliente: React.FC<FormularioSolicitudClienteProp
 
     setNombre('');
     setCorreo('');
+    setTelefono('');
     setDescripcionProyecto('');
     setFechaEntrega('');
     setFechaEvento('');
+    setFechaAsesoria('');
     setHoraEvento('');
     setDuracionProyecto('');
     setDuracionEvento('');
@@ -116,6 +126,17 @@ export const FormularioSolicitudCliente: React.FC<FormularioSolicitudClienteProp
       </div>
 
       <div>
+        <label className="mb-1 block text-[11px] font-semibold text-neutral-700">Número de teléfono</label>
+        <input
+          type="tel"
+          className="w-full rounded-2xl border border-neutral-200 bg-neutral-50 p-2.5 text-sm"
+          value={telefono}
+          onChange={(e) => setTelefono(e.target.value)}
+          placeholder="+34 600 000 000"
+        />
+      </div>
+
+      <div>
         <label className="mb-1 block text-[11px] font-semibold text-neutral-700">Tipo de servicio</label>
         <select
           className="w-full rounded-2xl border border-neutral-200 bg-neutral-50 p-2.5 text-sm"
@@ -128,23 +149,21 @@ export const FormularioSolicitudCliente: React.FC<FormularioSolicitudClienteProp
         </select>
       </div>
 
-      <div>
-        <label className="mb-1 block text-[11px] font-semibold text-neutral-700">Describe lo que necesitas</label>
-        <textarea
-          rows={3}
-          className="w-full rounded-2xl border border-neutral-200 bg-neutral-50 p-2.5 text-sm"
-          value={descripcionProyecto}
-          onChange={(e) => setDescripcionProyecto(e.target.value)}
-          placeholder="Cuenta el proyecto, evento o necesidad"
-        />
-      </div>
+      {tipoServicio !== 'asesoria-marca' && (
+        <div>
+          <label className="mb-1 block text-[11px] font-semibold text-neutral-700">Describe lo que necesitas</label>
+          <textarea
+            rows={3}
+            className="w-full rounded-2xl border border-neutral-200 bg-neutral-50 p-2.5 text-sm"
+            value={descripcionProyecto}
+            onChange={(e) => setDescripcionProyecto(e.target.value)}
+            placeholder="Cuenta el proyecto, evento o necesidad"
+          />
+        </div>
+      )}
 
       {tipoServicio === 'dev-ux-ui' && (
         <div className="space-y-3 rounded-2xl border border-neutral-200 bg-neutral-50 p-3">
-          <div>
-            <label className="mb-1 block text-[11px] font-semibold text-neutral-700">Fecha de entrega</label>
-            <input type="date" className="w-full rounded-2xl border border-neutral-200 bg-white p-2.5 text-sm" value={fechaEntrega} onChange={(e) => setFechaEntrega(e.target.value)} />
-          </div>
           <div>
             <label className="mb-1 block text-[11px] font-semibold text-neutral-700">Duración del proyecto</label>
             <input type="text" className="w-full rounded-2xl border border-neutral-200 bg-white p-2.5 text-sm" value={duracionProyecto} onChange={(e) => setDuracionProyecto(e.target.value)} placeholder="Ej. 3 semanas" />
@@ -155,22 +174,18 @@ export const FormularioSolicitudCliente: React.FC<FormularioSolicitudClienteProp
       {tipoServicio === 'asesoria-marca' && (
         <div className="space-y-3 rounded-2xl border border-neutral-200 bg-neutral-50 p-3">
           <div>
-            <label className="mb-1 block text-[11px] font-semibold text-neutral-700">Describe tu problema</label>
-            <textarea rows={3} className="w-full rounded-2xl border border-neutral-200 bg-white p-2.5 text-sm" value={problemaServicio} onChange={(e) => setProblemaServicio(e.target.value)} placeholder="Cuéntanos qué problema necesitas resolver" />
+            <label className="mb-1 block text-[11px] font-semibold text-neutral-700">Descripción de la asesoría</label>
+            <textarea rows={3} className="w-full rounded-2xl border border-neutral-200 bg-white p-2.5 text-sm" value={problemaServicio} onChange={(e) => setProblemaServicio(e.target.value)} placeholder="Cuéntanos qué asesoría necesitas" />
           </div>
           <div>
-            <label className="mb-1 block text-[11px] font-semibold text-neutral-700">Link de redes sociales</label>
-            <input type="text" className="w-full rounded-2xl border border-neutral-200 bg-white p-2.5 text-sm" value={redesSociales} onChange={(e) => setRedesSociales(e.target.value)} placeholder="https://instagram.com/tu-marca" />
+            <label className="mb-1 block text-[11px] font-semibold text-neutral-700">Posible fecha de asesoría</label>
+            <input type="date" className="w-full rounded-2xl border border-neutral-200 bg-white p-2.5 text-sm" value={fechaAsesoria} onChange={(e) => setFechaAsesoria(e.target.value)} />
           </div>
         </div>
       )}
 
       {tipoServicio === 'marketing-audiovisual' && (
         <div className="space-y-3 rounded-2xl border border-neutral-200 bg-neutral-50 p-3">
-          <div>
-            <label className="mb-1 block text-[11px] font-semibold text-neutral-700">Fecha del evento / trabajo</label>
-            <input type="date" className="w-full rounded-2xl border border-neutral-200 bg-white p-2.5 text-sm" value={fechaEvento} onChange={(e) => setFechaEvento(e.target.value)} />
-          </div>
           <div>
             <label className="mb-1 block text-[11px] font-semibold text-neutral-700">Duración</label>
             <input type="text" className="w-full rounded-2xl border border-neutral-200 bg-white p-2.5 text-sm" value={duracionEvento} onChange={(e) => setDuracionEvento(e.target.value)} placeholder="Ej. 1 día" />

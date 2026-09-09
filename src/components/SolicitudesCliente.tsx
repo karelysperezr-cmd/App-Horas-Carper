@@ -77,6 +77,12 @@ export const SolicitudesCliente: React.FC<SolicitudesClienteProps> = ({ solicitu
                 <span className="font-semibold">Pago</span>
                 <span>{solicitud.metodoPago} • {solicitud.moneda}</span>
               </div>
+              {solicitud.telefono && (
+                <div className="flex justify-between">
+                  <span className="font-semibold">Teléfono</span>
+                  <span>{solicitud.telefono}</span>
+                </div>
+              )}
             </div>
 
             <div className="space-y-1 text-[11px] text-neutral-700">

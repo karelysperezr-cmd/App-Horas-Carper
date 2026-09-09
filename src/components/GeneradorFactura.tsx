@@ -29,15 +29,18 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
   const [firmaResponsable, setFirmaResponsable] = useState<string>('');
   const [registrosSeleccionados, setRegistrosSeleccionados] = useState<string[]>([]);
 
-  const clienteActual = clientes.find(c => c.id === clienteId);
-  const registrosCliente = registros.filter(r => r.clienteId === clienteId && r.completado);
+  const esPresupuesto = modoDocumento === 'presupuesto';
+  const clienteActual = esPresupuesto ? undefined : clientes.find(c => c.id === clienteId);
+  const registrosCliente = esPresupuesto
+    ? registros.filter(r => r.completado)
+    : registros.filter(r => r.clienteId === clienteId && r.completado);
   const registrosParaDocumento = registrosCliente.filter((registro) => registrosSeleccionados.includes(registro.id));
 
   const totalHorasCalculadas = registrosParaDocumento.reduce((acc, curr) => acc + curr.totalHoras, 0);
-  const montoTotal = clienteActual
-    ? (tipoCobroSeleccionado === 'hora' ? totalHorasCalculadas * clienteActual.tarifaHora : montoContrato)
-    : 0;
-  const esPresupuesto = modoDocumento === 'presupuesto';
+  const montoTotal = esPresupuesto
+    ? montoContrato
+    : (clienteActual ? (tipoCobroSeleccionado === 'hora' ? totalHorasCalculadas * clienteActual.tarifaHora : montoContrato) : 0);
+
 
   const handleCargarLogo = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -51,7 +54,7 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
   };
 
   const generarPDFLegacy = () => {
-    if (!clienteActual) return;
+    if (!esPresupuesto && !clienteActual) return;
 
     const doc = new jsPDF();
     const fechaActual = new Date().toLocaleDateString();
@@ -59,7 +62,7 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
     const pie = esPresupuesto
       ? 'Este presupuesto tiene una vigencia de 7 días y puede ajustarse según cambios de alcance.'
       : 'Gracias por confiar en nuestro trabajo. Pago preferentemente por transferencia.';
-    const destinatarioTexto = destinatario.trim() || clienteActual.nombre;
+    const destinatarioTexto = destinatario.trim() || (clienteActual?.nombre ?? 'Cliente');
     const explicacionTexto = explicacionPresupuesto.trim() || 'Aquí puedes detallar el alcance, condiciones y alcance del servicio solicitado.';
     const firmaTexto = firmaResponsable.trim() || 'Nombre y cargo del responsable';
     let currentY = 20;
@@ -74,7 +77,9 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     doc.setTextColor(82, 82, 91);
-    doc.text(`Cliente: ${clienteActual.nombre}`, 20, 32);
+    if (!esPresupuesto && clienteActual) {
+      doc.text(`Cliente: ${clienteActual.nombre}`, 20, 32);
+    }
     doc.text(`Fecha: ${fechaActual}`, 20, 39);
 
     if (logoBase64) {
@@ -86,18 +91,20 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
     }
 
     currentY = 60;
-    doc.setDrawColor(226, 232, 240);
-    doc.roundedRect(14, currentY - 8, 182, 34, 3, 3, 'S');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(15, 23, 42);
-    doc.text('Datos del cliente', 20, currentY);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.setTextColor(82, 82, 91);
-    doc.text(`Modalidad: ${tipoCobroSeleccionado === 'hora' ? 'Pago por Hora' : 'Contrato Fijo'}`, 20, currentY + 8);
-    doc.text(`Tarifa por Hora: $${clienteActual.tarifaHora}`, 20, currentY + 14);
-    doc.text(`Alcance estimado: ${registrosCliente.length} jornadas registradas`, 20, currentY + 20);
+    if (!esPresupuesto && clienteActual) {
+      doc.setDrawColor(226, 232, 240);
+      doc.roundedRect(14, currentY - 8, 182, 34, 3, 3, 'S');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(15, 23, 42);
+      doc.text('Datos del cliente', 20, currentY);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(82, 82, 91);
+      doc.text(`Modalidad: ${tipoCobroSeleccionado === 'hora' ? 'Pago por Hora' : 'Contrato Fijo'}`, 20, currentY + 8);
+      doc.text(`Tarifa por Hora: $${clienteActual.tarifaHora}`, 20, currentY + 14);
+      doc.text(`Alcance estimado: ${registrosCliente.length} jornadas registradas`, 20, currentY + 20);
+    }
 
     if (esPresupuesto) {
       currentY = 106;
@@ -198,11 +205,12 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
     }
 
     const prefijo = esPresupuesto ? 'Presupuesto' : 'Factura';
-    doc.save(`${prefijo}_${clienteActual.nombre.replace(/\s+/g, '_')}_${Date.now()}.pdf`);
+    const baseNombre = esPresupuesto ? 'presupuesto-rapido' : (clienteActual?.nombre ?? 'cliente').replace(/\s+/g, '_');
+    doc.save(`${prefijo}_${baseNombre}_${Date.now()}.pdf`);
 
     const nuevaFactura: Factura = {
       id: Date.now().toString(),
-      clienteId,
+      clienteId: clienteActual?.id ?? clienteId,
       fechaEmision: fechaActual,
       registrosIds: registrosParaDocumento.map((r) => r.id),
       totalHoras: totalHorasCalculadas,
@@ -216,14 +224,14 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
   };
 
   const generarPDF = async () => {
-    if (!clienteActual) return;
+    if (!esPresupuesto && !clienteActual) return;
 
     try {
       const detalle = esPresupuesto
         ? (explicacionPresupuesto.trim() || 'Alcance y condiciones del servicio solicitado.')
         : `Servicio prestado en ${registrosParaDocumento.length} jornadas registradas.`;
       await generarPresupuestoPDF({
-        cliente: destinatario.trim() || clienteActual.nombre,
+        cliente: destinatario.trim() || (clienteActual?.nombre ?? 'Cliente'),
         titulo: esPresupuesto ? 'Presupuesto de servicios' : 'Factura de servicios',
         fecha: new Date().toLocaleDateString('es-ES'),
         servicio: esPresupuesto ? 'Propuesta personalizada' : 'Servicios profesionales',
@@ -234,7 +242,7 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
 
       onGuardarFactura({
         id: Date.now().toString(),
-        clienteId,
+        clienteId: clienteActual?.id ?? clienteId,
         fechaEmision: new Date().toLocaleDateString('es-ES'),
         registrosIds: registrosParaDocumento.map((registro) => registro.id),
         totalHoras: totalHorasCalculadas,
@@ -296,23 +304,25 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
         )}
       </div>
 
-      <div>
-        <label className="block text-xs font-medium text-neutral-700 mb-1">Seleccionar Cliente</label>
-        <select 
-          className="w-full p-3 border border-neutral-200 rounded-2xl bg-neutral-50 text-neutral-900 text-xs"
-          value={clienteId}
-          onChange={(e) => {
-            const nuevoClienteId = e.target.value;
-            setClienteId(nuevoClienteId);
-            setRegistrosSeleccionados(registros.filter((registro) => registro.clienteId === nuevoClienteId && registro.completado).map((registro) => registro.id));
-          }}
-        >
-          <option value="">-- Elige un cliente --</option>
-          {clientes.map(c => (
-            <option key={c.id} value={c.id}>{c.nombre}</option>
-          ))}
-        </select>
-      </div>
+      {!esPresupuesto && (
+        <div>
+          <label className="block text-xs font-medium text-neutral-700 mb-1">Seleccionar Cliente</label>
+          <select 
+            className="w-full p-3 border border-neutral-200 rounded-2xl bg-neutral-50 text-neutral-900 text-xs"
+            value={clienteId}
+            onChange={(e) => {
+              const nuevoClienteId = e.target.value;
+              setClienteId(nuevoClienteId);
+              setRegistrosSeleccionados(registros.filter((registro) => registro.clienteId === nuevoClienteId && registro.completado).map((registro) => registro.id));
+            }}
+          >
+            <option value="">-- Elige un cliente --</option>
+            {clientes.map(c => (
+              <option key={c.id} value={c.id}>{c.nombre}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {esPresupuesto && (
         <div className="space-y-3 rounded-2xl border border-neutral-200 bg-neutral-50 p-3">
@@ -349,7 +359,7 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
         </div>
       )}
 
-      {clienteActual && (
+      {(clienteActual || esPresupuesto) && (
         <div className="space-y-3 rounded-2xl border border-neutral-200 bg-white p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
@@ -363,7 +373,7 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
           </div>
           <div className="max-h-48 space-y-2 overflow-y-auto">
             {registrosCliente.length === 0 ? (
-              <p className="rounded-xl bg-neutral-50 p-3 text-[11px] text-neutral-500">Este cliente todavía no tiene jornadas completadas.</p>
+              <p className="rounded-xl bg-neutral-50 p-3 text-[11px] text-neutral-500">{esPresupuesto ? 'Todavía no hay jornadas completadas para generar un presupuesto.' : 'Este cliente todavía no tiene jornadas completadas.'}</p>
             ) : registrosCliente.map((registro) => (
               <label key={registro.id} className="flex cursor-pointer items-start gap-3 rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-xs transition hover:border-neutral-400">
                 <input type="checkbox" checked={registrosSeleccionados.includes(registro.id)} onChange={() => setRegistrosSeleccionados((actuales) => actuales.includes(registro.id) ? actuales.filter((id) => id !== registro.id) : [...actuales, registro.id])} className="mt-0.5 h-4 w-4 accent-black" />
@@ -374,7 +384,7 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
         </div>
       )}
 
-      {clienteActual && (
+      {(!esPresupuesto && clienteActual) && (
         <div className="space-y-4 pt-2 border-t border-neutral-100">
           <div>
             <label className="block text-xs font-medium text-neutral-700 mb-1">Modalidad de Cobro</label>
@@ -409,7 +419,7 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
 
           <div className="bg-neutral-50 p-4 rounded-2xl border border-neutral-200 space-y-2 text-xs">
             <div className="flex justify-between text-neutral-700">
-              <span>{esPresupuesto ? 'Jornadas incluidas:' : 'Jornadas sin facturar:'}</span>
+              <span>Jornadas sin facturar:</span>
               <span className="font-bold">{registrosParaDocumento.length}</span>
             </div>
             <div className="flex justify-between text-neutral-700">
@@ -417,7 +427,7 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
               <span className="font-bold">{totalHorasCalculadas} hrs</span>
             </div>
             <div className="flex justify-between font-bold text-neutral-900 pt-2 border-t border-neutral-200 text-sm">
-              <span>{esPresupuesto ? 'Total del Presupuesto:' : 'Total a Facturar:'}</span>
+              <span>Total a Facturar:</span>
               <span className="text-emerald-600">${montoTotal.toFixed(2)}</span>
             </div>
           </div>
@@ -427,7 +437,45 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
             disabled={registrosParaDocumento.length === 0}
             className="w-full bg-black hover:bg-neutral-800 text-white py-3 rounded-2xl text-xs font-medium shadow flex items-center justify-center gap-2 transition disabled:opacity-50"
           >
-            <Download size={16} /> {esPresupuesto ? 'Descargar Presupuesto en PDF' : 'Descargar Factura en PDF'}
+            <Download size={16} /> Descargar Factura en PDF
+          </button>
+        </div>
+      )}
+
+      {esPresupuesto && (
+        <div className="space-y-4 pt-2 border-t border-neutral-100">
+          <div>
+            <label className="block text-xs font-medium text-neutral-700 mb-1">Monto del Contrato ($)</label>
+            <input 
+              type="number"
+              className="w-full p-3 border border-neutral-200 rounded-2xl bg-neutral-50 text-xs"
+              placeholder="Ej. 500"
+              value={montoContrato || ''}
+              onChange={(e) => setMontoContrato(Number(e.target.value))}
+            />
+          </div>
+
+          <div className="bg-neutral-50 p-4 rounded-2xl border border-neutral-200 space-y-2 text-xs">
+            <div className="flex justify-between text-neutral-700">
+              <span>Jornadas incluidas:</span>
+              <span className="font-bold">{registrosParaDocumento.length}</span>
+            </div>
+            <div className="flex justify-between text-neutral-700">
+              <span>Total Horas Acumuladas:</span>
+              <span className="font-bold">{totalHorasCalculadas} hrs</span>
+            </div>
+            <div className="flex justify-between font-bold text-neutral-900 pt-2 border-t border-neutral-200 text-sm">
+              <span>Total del Presupuesto:</span>
+              <span className="text-emerald-600">${montoTotal.toFixed(2)}</span>
+            </div>
+          </div>
+
+          <button
+            onClick={generarPDF}
+            disabled={registrosParaDocumento.length === 0}
+            className="w-full bg-black hover:bg-neutral-800 text-white py-3 rounded-2xl text-xs font-medium shadow flex items-center justify-center gap-2 transition disabled:opacity-50"
+          >
+            <Download size={16} /> Descargar Presupuesto en PDF
           </button>
         </div>
       )}

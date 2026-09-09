@@ -43,10 +43,12 @@ export interface SolicitudPresupuesto {
   id: string;
   nombreCliente: string;
   correo: string;
+  telefono?: string;
   tipoServicio: 'dev-ux-ui' | 'asesoria-marca' | 'marketing-audiovisual' | 'fotografia-eventos';
   descripcionProyecto: string;
   fechaEntrega?: string;
   fechaEvento?: string;
+  fechaAsesoria?: string;
   horaEvento?: string;
   duracionProyecto?: string;
   duracionEvento?: string;

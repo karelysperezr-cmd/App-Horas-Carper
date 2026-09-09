@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import jsPDF from 'jspdf';
 import { Fichaje } from './components/Fichaje';
 import { GeneradorFactura } from './components/GeneradorFactura';
 import { SolicitudesCliente } from './components/SolicitudesCliente';
@@ -167,6 +168,9 @@ export function App() {
     return leerDatosPersistidos().solicitudes;
   });
 
+  const [clienteSeleccionadoId, setClienteSeleccionadoId] = useState<string | null>(null);
+  const clienteSeleccionado = clientes.find((cliente) => cliente.id === clienteSeleccionadoId) ?? null;
+
   const [nuevoClienteNombre, setNuevoClienteNombre] = useState<string>('');
   const [nuevaTarifa, setNuevaTarifa] = useState<number>(20);
 
@@ -310,6 +314,64 @@ export function App() {
       setFacturas([]);
       guardarDatosPersistidos({ clientes, registros: [], facturas: [], solicitudes });
     }
+  };
+
+  const descargarFacturaAntigua = (factura: Factura) => {
+    const cliente = clientes.find((item) => item.id === factura.clienteId);
+    const registrosFactura = registros.filter((registro) => factura.registrosIds.includes(registro.id));
+    const doc = new jsPDF();
+    const fecha = factura.fechaEmision || new Date().toLocaleDateString('es-ES');
+
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(14, 12, 182, 38, 3, 3, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.setTextColor(15, 23, 42);
+    doc.text('FACTURA DE SERVICIOS', 20, 24);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(82, 82, 91);
+    doc.text(`Cliente: ${cliente?.nombre ?? 'Cliente'}`, 20, 32);
+    doc.text(`Fecha: ${fecha}`, 20, 39);
+
+    let y = 70;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(15, 23, 42);
+    doc.text('Detalle de la factura', 20, y);
+    y += 10;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(51, 65, 85);
+    doc.text(`Tipo de cobro: ${factura.tipoCobro === 'hora' ? 'Por Hora' : 'Contrato Fijo'}`, 20, y);
+    y += 8;
+    doc.text(`Horas: ${factura.totalHoras} hrs`, 20, y);
+    y += 8;
+    doc.text(`Monto total: $${factura.montoTotal.toFixed(2)}`, 20, y);
+    y += 12;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text('Jornadas', 20, y);
+    doc.text('Horas', 80, y);
+    y += 8;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    registrosFactura.forEach((registro) => {
+      if (y > 255) {
+        doc.addPage();
+        y = 24;
+      }
+      doc.text(registro.fecha, 20, y);
+      doc.text(`${registro.totalHoras}h`, 80, y);
+      y += 7;
+    });
+
+    const nombreCliente = (cliente?.nombre ?? 'cliente').replace(/\s+/g, '_');
+    doc.save(`Factura_${nombreCliente}_${fecha.replace(/\//g, '-')}.pdf`);
   };
 
   const exportarDatos = () => {
@@ -605,7 +667,9 @@ export function App() {
               <div className="space-y-2">
                 {clientes.map((c) => (
                   <div key={c.id} className="p-3 bg-neutral-50 rounded-2xl border border-neutral-100 flex flex-wrap justify-between items-center gap-2 text-xs">
-                    <span className="font-semibold text-neutral-900">{c.nombre}</span>
+                    <button type="button" onClick={() => setClienteSeleccionadoId(c.id)} className="flex-1 min-w-[160px] text-left font-semibold text-neutral-900 hover:text-black">
+                      {c.nombre}
+                    </button>
                     <div className="flex items-center gap-2">
                       <span className="px-2.5 py-1 bg-white border border-neutral-200 rounded-xl text-neutral-700 font-medium">
                         ${c.tarifaHora}/h
@@ -620,6 +684,40 @@ export function App() {
                   </div>
                 ))}
               </div>
+
+              {clienteSeleccionado && (
+                <div className="mt-4 rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-neutral-500">Historial de facturas</p>
+                      <h4 className="mt-1 text-sm font-semibold text-neutral-900">{clienteSeleccionado.nombre}</h4>
+                    </div>
+                    <button type="button" onClick={() => setClienteSeleccionadoId(null)} className="text-[11px] font-medium text-neutral-500 underline">
+                      Cerrar
+                    </button>
+                  </div>
+
+                  {facturas.filter((factura) => factura.clienteId === clienteSeleccionado.id).length === 0 ? (
+                    <p className="mt-3 rounded-xl border border-dashed border-neutral-200 bg-white p-3 text-[11px] text-neutral-500">
+                      Este cliente todavía no tiene facturas generadas.
+                    </p>
+                  ) : (
+                    <div className="mt-3 space-y-2">
+                      {facturas.filter((factura) => factura.clienteId === clienteSeleccionado.id).map((factura) => (
+                        <div key={factura.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-white p-3">
+                          <div className="text-[11px] text-neutral-600">
+                            <span className="block font-semibold text-neutral-900">{factura.fechaEmision}</span>
+                            <span className="block mt-1">{factura.totalHoras}h · ${factura.montoTotal.toFixed(2)}</span>
+                          </div>
+                          <button type="button" onClick={() => descargarFacturaAntigua(factura)} className="flex items-center gap-1 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-[11px] font-semibold text-neutral-700 hover:bg-neutral-100">
+                            <Download size={13} /> Descargar
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}

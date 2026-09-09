@@ -1,3 +1,6 @@
 name = "control-horas-app"
 compatibility_date = "2026-09-01"
 pages_build_output_dir = "./dist"
+
+# Cloudflare Pages static export expects pages deploy, not wrangler deploy.
+# Use: npx wrangler pages deploy ./dist --project-name=control-horas-app
