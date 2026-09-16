@@ -352,22 +352,30 @@ export function App() {
     doc.text(`Monto total: $${factura.montoTotal.toFixed(2)}`, 20, y);
     y += 12;
 
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.text('Jornadas', 20, y);
-    doc.text('Horas', 80, y);
-    y += 8;
+    const detalleServicio = registrosFactura.length > 0
+      ? registrosFactura
+          .map((registro) => {
+            const actividades = registro.actividades.length > 0
+              ? registro.actividades.map((actividad) => `${actividad.tipo.toUpperCase()}: ${actividad.descripcion}`).join(' • ')
+              : 'Sin actividades registradas';
 
+            return `• ${registro.fecha} — ${registro.totalHoras}h — ${actividades}`;
+          })
+          .join('\n')
+      : 'Sin detalle de servicio registrado.';
+
+    const lineasDetalle = doc.splitTextToSize(detalleServicio, 160);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
-    registrosFactura.forEach((registro) => {
+    doc.setTextColor(51, 65, 85);
+
+    lineasDetalle.forEach((linea: string) => {
       if (y > 255) {
         doc.addPage();
         y = 24;
       }
-      doc.text(registro.fecha, 20, y);
-      doc.text(`${registro.totalHoras}h`, 80, y);
-      y += 7;
+      doc.text(linea, 20, y);
+      y += 6;
     });
 
     const nombreCliente = (cliente?.nombre ?? 'cliente').replace(/\s+/g, '_');
@@ -460,9 +468,9 @@ export function App() {
           <div className="text-center space-y-2">
             <div className="w-16 h-16 bg-white mx-auto rounded-2xl flex items-center justify-center shadow-inner overflow-hidden border border-neutral-700">
               <img
-                src="/icons.svg"
+                src="/carper-logo.png"
                 alt="Logo CARPER"
-                className="w-10 h-10 object-contain"
+                className="w-14 h-14 object-contain"
               />
             </div>
             <h1 className="text-2xl font-semibold tracking-tight">CARPER</h1>
@@ -515,9 +523,9 @@ export function App() {
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-black rounded-full flex items-center justify-center overflow-hidden border border-neutral-200">
             <img
-              src="/icons.svg"
+              src="/carper-logo.png"
               alt="Logo CARPER"
-              className="w-5 h-5 object-contain"
+              className="w-7 h-7 object-contain"
             />
           </div>
           <div>

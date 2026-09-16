@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowRight, Camera, Check, Lightbulb, LockKeyhole, Megaphone, Palette, Send, Sparkles } from 'lucide-react';
+import { ArrowRight, Camera, Check, Lightbulb, LockKeyhole, Megaphone, Palette, Send } from 'lucide-react';
 import { FormularioSolicitudCliente } from './FormularioSolicitudCliente';
 import type { SolicitudPresupuesto } from '../types';
 
@@ -37,7 +37,9 @@ export function VistaPublica({ onEnviarSolicitud, onAcceder }: VistaPublicaProps
     <div className="min-h-screen bg-[#f7f7f5] text-[#1d1d1f]">
       <header className="mx-auto flex max-w-6xl items-center justify-between border-b border-[#dededb] px-5 py-5 lg:px-10">
         <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1d1d1f] text-white"><Sparkles size={15} /></div>
+          <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-[#1d1d1f]">
+            <img src="/carper-logo.png" alt="Logo CARPER" className="h-8 w-8 object-contain" />
+          </div>
           <p className="text-sm font-semibold tracking-[0.18em]">CARPER</p>
         </div>
         <button type="button" onClick={onAcceder} className="flex items-center gap-2 rounded-full px-3 py-2 text-xs font-medium text-[#6e6e73] transition hover:bg-[#ebebeb] hover:text-[#1d1d1f]"><LockKeyhole size={14} /> Acceso interno</button>

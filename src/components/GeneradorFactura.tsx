@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { FileText, Download, Image as ImageIcon, CheckCircle2, Trash2 } from 'lucide-react';
 import type { Cliente, RegistroJornada, Factura } from '../types';
 import jsPDF from 'jspdf';
@@ -41,6 +41,25 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
     ? montoContrato
     : (clienteActual ? (tipoCobroSeleccionado === 'hora' ? totalHorasCalculadas * clienteActual.tarifaHora : montoContrato) : 0);
 
+  const construirDetalleServicio = () => {
+    if (esPresupuesto) {
+      return explicacionPresupuesto.trim() || 'Alcance y condiciones del servicio solicitado.';
+    }
+
+    if (registrosParaDocumento.length === 0) {
+      return 'Sin detalle de servicio seleccionado.';
+    }
+
+    return registrosParaDocumento
+      .map((registro) => {
+        const actividades = registro.actividades.length > 0
+          ? registro.actividades.map((actividad) => `${actividad.tipo.toUpperCase()}: ${actividad.descripcion}`).join(' • ')
+          : 'Sin actividades registradas';
+
+        return `• ${registro.fecha} — ${registro.totalHoras}h — ${actividades}`;
+      })
+      .join('\n');
+  };
 
   const handleCargarLogo = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -227,9 +246,16 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
     if (!esPresupuesto && !clienteActual) return;
 
     try {
-      const detalle = esPresupuesto
-        ? (explicacionPresupuesto.trim() || 'Alcance y condiciones del servicio solicitado.')
-        : `Servicio prestado en ${registrosParaDocumento.length} jornadas registradas.`;
+      const detalle = construirDetalleServicio();
+      const detalleServicios = registrosParaDocumento.map((registro, index) => ({
+        jornada: index + 1,
+        fecha: registro.fecha,
+        horas: registro.totalHoras,
+        actividades: registro.actividades.length > 0
+          ? registro.actividades.map((actividad) => `${actividad.tipo.toUpperCase()}: ${actividad.descripcion}`)
+          : ['Sin actividades registradas']
+      }));
+
       await generarPresupuestoPDF({
         cliente: destinatario.trim() || (clienteActual?.nombre ?? 'Cliente'),
         titulo: esPresupuesto ? 'Presupuesto de servicios' : 'Factura de servicios',
@@ -237,7 +263,41 @@ export const GeneradorFactura: React.FC<GeneradorFacturaProps> = ({
         servicio: esPresupuesto ? 'Propuesta personalizada' : 'Servicios profesionales',
         descripcion: detalle,
         total: montoTotal,
-        logo: logoBase64
+        moneda: 'USD',
+        vigencia: '7 días hábiles',
+        logo: logoBase64,
+        emisor: {
+          nombre: 'CARPER',
+          razon_social: 'CARPER / ESTUDIO DIGITAL',
+          subtitulo: 'Marketing & Software Development'
+        },
+        documento: {
+          tipo: esPresupuesto ? 'Presupuesto de servicios' : 'Factura de servicios',
+          fecha_emision: new Date().toLocaleDateString('es-ES'),
+          vigencia: '7 días hábiles',
+          moneda: 'USD',
+          estado: 'Sujeto a alcance final'
+        },
+        clienteDetalle: {
+          nombre: destinatario.trim() || (clienteActual?.nombre ?? 'Cliente'),
+          alcance_propuesto: esPresupuesto ? 'Propuesta personalizada' : 'Servicios profesionales',
+          descripcion_alcance: esPresupuesto
+            ? detalle
+            : `Servicio prestado en ${registrosParaDocumento.length} jornadas registradas.`
+        },
+        detalle_servicios: detalleServicios,
+        resumen: {
+          total_jornadas: registrosParaDocumento.length,
+          total_horas: totalHorasCalculadas,
+          precio_hora_usd: clienteActual?.tarifaHora ?? 0,
+          inversion_estimada_usd: montoTotal
+        },
+        terminos_y_condiciones: [
+          'Vigencia de la propuesta: 7 días a partir de la fecha de emisión.',
+          'Condición: Sujeto a confirmación de alcance final.',
+          'Forma de pago: A convenir según hitos de entrega y conformidad.'
+        ],
+        pie_de_pagina: 'Gracias por considerar a CARPER para tu próximo proyecto.'
       });
 
       onGuardarFactura({
