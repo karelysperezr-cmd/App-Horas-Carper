@@ -3,9 +3,10 @@ import jsPDF from 'jspdf';
 import { Fichaje } from './components/Fichaje';
 import { GeneradorFactura } from './components/GeneradorFactura';
 import { SolicitudesCliente } from './components/SolicitudesCliente';
+import { VideoStudio } from './components/VideoStudio';
 import { VistaPublica } from './components/VistaPublica';
 import type { Cliente, RegistroJornada, Factura, SolicitudPresupuesto } from './types';
-import { Clock, FileText, Users, LogOut, Plus, Briefcase, Download, Upload, Sparkles, CalendarDays } from 'lucide-react';
+import { Clock, FileText, Users, LogOut, Plus, Briefcase, Download, Upload, Sparkles, CalendarDays, Film } from 'lucide-react';
 
 const CLIENTES_DE_EJEMPLO = ['Intercenter Colombia', 'DICA CASTELL'];
 const STORAGE_KEY = 'carper-app-data';
@@ -148,7 +149,7 @@ export function App() {
   const [errorLogin, setErrorLogin] = useState<string>('');
   const [mostrarLogin, setMostrarLogin] = useState(false);
 
-  const [pestanaActiva, setPestanaActiva] = useState<'fichaje' | 'facturas' | 'clientes' | 'solicitudes'>('fichaje');
+  const [pestanaActiva, setPestanaActiva] = useState<'fichaje' | 'facturas' | 'clientes' | 'solicitudes' | 'video'>('fichaje');
   const [modoDocumento, setModoDocumento] = useState<'factura' | 'presupuesto'>('factura');
 
   const [clientes, setClientes] = useState<Cliente[]>(() => {
@@ -560,6 +561,8 @@ export function App() {
           />
         )}
 
+        {pestanaActiva === 'video' && <VideoStudio />}
+
         {pestanaActiva === 'facturas' && (
           <GeneradorFactura
             clientes={clientes}
@@ -755,6 +758,14 @@ export function App() {
           >
             <Sparkles size={18} />
             <span>Solicitudes</span>
+          </button>
+
+          <button
+            onClick={() => setPestanaActiva('video')}
+            className={`flex flex-1 min-w-0 flex-col items-center justify-center gap-1 rounded-2xl px-1 py-2 text-[10px] leading-tight transition ${pestanaActiva === 'video' ? 'bg-black text-white shadow-sm' : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800'}`}
+          >
+            <Film size={18} />
+            <span>Video IA</span>
           </button>
 
           <button
